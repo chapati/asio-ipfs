@@ -133,6 +133,19 @@ target_link_libraries(asio-ipfs
     INTERFACE ${Boost_LIBRARIES}
 )
 
+# The static library asio-ipfs requires a separately compiled asio,
+# so supply one for the tests and examples.
+add_library(asio-ipfs_static_asio STATIC "lib/asio.cpp")
+target_link_libraries(asio-ipfs_static_asio
+        PUBLIC
+        Boost::boost
+        INTERFACE
+        ${Boost_LIBRARIES}
+        Threads::Threads
+        )
+target_compile_definitions(asio-ipfs_static_asio
+        PUBLIC -DBOOST_ASIO_SEPARATE_COMPILATION
+        )
 
 ################################################################################
 if(ASIO_IPFS_WITH_EXAMPLE_BINARIES)
@@ -140,22 +153,6 @@ if(ASIO_IPFS_WITH_EXAMPLE_BINARIES)
     find_package(Boost ${BOOST_VERSION} REQUIRED COMPONENTS
         program_options
     )
-
-
-    # The static library asio-ipfs requires a separately compiled asio,
-    # so supply one for the tests and examples.
-    add_library(asio-ipfs_static_asio STATIC "lib/asio.cpp")
-    target_link_libraries(asio-ipfs_static_asio
-        PUBLIC
-            Boost::boost
-        INTERFACE
-            ${Boost_LIBRARIES}
-            Threads::Threads
-    )
-    target_compile_definitions(asio-ipfs_static_asio
-        PUBLIC -DBOOST_ASIO_SEPARATE_COMPILATION
-    )
-
 
     add_executable(ipfs-example "example/ipfs.cpp")
     target_link_libraries(ipfs-example

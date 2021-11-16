@@ -16,13 +16,10 @@ class node {
     using Cancel = std::function<void()>;
 
     template<class Token, class... Ret>
-    using Handler = typename boost::asio::handler_type
-                        < Token
-                        , void(boost::system::error_code, Ret...)
-                        >::type;
+    using Result = typename boost::asio::async_result<std::decay_t<Token>, void(boost::system::error_code, Ret...)>;
 
     template<class Token, class... Ret>
-    using Result = typename boost::asio::async_result<Handler<Token, Ret...>>;
+    using Handler = typename boost::asio::async_result<std::decay_t<Token>, void(boost::system::error_code, Ret...)>::completion_handler_type;
 
     using string_view = boost::string_view;
 
@@ -50,43 +47,47 @@ public:
 
     template<class Token>
     static
-    typename Result<Token, std::unique_ptr<node>>::type
+    typename Result<Token, std::unique_ptr<node>>::return_type
     build(boost::asio::io_service&, const std::string& repo_path, config, Token&&);
 
     template<class Token>
     static
-    typename Result<Token, std::unique_ptr<node>>::type
+    typename Result<Token, std::unique_ptr<node>>::return_type
     build(boost::asio::io_service&, const std::string& repo_path, config, Cancel&, Token&&);
 
     // Returns this node's IPFS ID
     std::string id() const;
 
     template<class Token>
-    typename Result<Token, std::string>::type
+    typename Result<Token, std::string>::return_type
     add(const uint8_t* data, size_t size, Token&&);
 
     template<class Token>
-    typename Result<Token, std::string>::type
+    typename Result<Token, std::string>::return_type
     add(const std::string&, Token&&); // Convenience function.
 
     template<class Token>
-    typename Result<Token, std::string>::type
+    typename Result<Token, std::string>::return_type
     add(const uint8_t* data, size_t size, Cancel&, Token&&);
 
     template<class Token>
-    typename Result<Token, std::string>::type
+    typename Result<Token, std::string>::return_type
     add(const std::string&, Cancel&, Token&&); // Convenience function.
 
     template<class Token>
-    typename Result<Token, std::string>::type
+    typename Result<Token, std::string>::return_type
     calculate_cid(const string_view, Cancel&, Token&&);
 
     template<class Token>
-    typename Result<Token, std::string>::type
+    typename Result<Token, std::vector<uint8_t>>::return_type
+    cat(const std::string& cid, Cancel& cancel, Token&&);
+
+    template<class Token>
+    typename Result<Token, std::string>::return_type
     cat(string_view cid, Token&&);
 
     template<class Token>
-    typename Result<Token, std::string>::type
+    typename Result<Token, std::string>::return_type
     cat(string_view cid, Cancel&, Token&&);
 
     template<class Token>
@@ -98,11 +99,11 @@ public:
     publish(const std::string& cid, Timer::duration, Cancel&, Token&&);
 
     template<class Token>
-    typename Result<Token, std::string>::type
+    typename Result<Token, std::string>::return_type
     resolve(const std::string& node_id, Token&&);
 
     template<class Token>
-    typename Result<Token, std::string>::type
+    typename Result<Token, std::string>::return_type
     resolve(const std::string& node_id, Cancel&, Token&&);
 
     template<class Token>
@@ -139,13 +140,17 @@ private:
 
     void add_( const uint8_t* data, size_t size
              , Cancel*
-             , std::function<void(boost::system::error_code, std::string)>);
+             , std::function<void(boost::system::error_code, std::string)>&&);
 
     void calculate_cid_( const string_view
                        , Cancel*
                        , std::function<void(boost::system::error_code, std::string)>);
 
-    void cat_( string_view cid
+    void cat_(string_view cid
+             , Cancel*
+             , std::function<void(boost::system::error_code, std::vector<uint8_t>)>);
+
+    void cat_(string_view cid
              , Cancel*
              , std::function<void(boost::system::error_code, std::string)>);
 
@@ -172,7 +177,7 @@ private:
 
 template<class Token>
 inline
-typename node::Result<Token, std::unique_ptr<node>>::type
+typename node::Result<Token, std::unique_ptr<node>>::return_type
 node::build( boost::asio::io_service& ios
            , const std::string& repo_path
            , config cfg
@@ -187,7 +192,7 @@ node::build( boost::asio::io_service& ios
 
 template<class Token>
 inline
-typename node::Result<Token, std::unique_ptr<node>>::type
+typename node::Result<Token, std::unique_ptr<node>>::return_type
 node::build( boost::asio::io_service& ios
            , const std::string& repo_path
            , config cfg
@@ -203,7 +208,7 @@ node::build( boost::asio::io_service& ios
 
 template<class Token>
 inline
-typename node::Result<Token, std::string>::type
+typename node::Result<Token, std::string>::return_type
 node::add(const uint8_t* data, size_t size, Token&& token)
 {
     Handler<Token, std::string> handler(std::forward<Token>(token));
@@ -214,7 +219,7 @@ node::add(const uint8_t* data, size_t size, Token&& token)
 
 template<class Token>
 inline
-typename node::Result<Token, std::string>::type
+typename node::Result<Token, std::string>::return_type
 node::add(const uint8_t* data, size_t size, Cancel& cancel, Token&& token)
 {
     Handler<Token, std::string> handler(std::forward<Token>(token));
@@ -225,7 +230,7 @@ node::add(const uint8_t* data, size_t size, Cancel& cancel, Token&& token)
 
 template<class Token>
 inline
-typename node::Result<Token, std::string>::type
+typename node::Result<Token, std::string>::return_type
 node::add(const std::string& data, Token&& token)
 {
     Handler<Token, std::string> handler(std::forward<Token>(token));
@@ -239,7 +244,7 @@ node::add(const std::string& data, Token&& token)
 
 template<class Token>
 inline
-typename node::Result<Token, std::string>::type
+typename node::Result<Token, std::string>::return_type
 node::add(const std::string& data, Cancel& cancel, Token&& token)
 {
     Handler<Token, std::string> handler(std::forward<Token>(token));
@@ -253,7 +258,7 @@ node::add(const std::string& data, Cancel& cancel, Token&& token)
 
 template<class Token>
 inline
-typename node::Result<Token, std::string>::type
+typename node::Result<Token, std::string>::return_type
 node::calculate_cid(const string_view data, Cancel& cancel, Token&& token)
 {
     Handler<Token, std::string> handler(std::forward<Token>(token));
@@ -263,8 +268,18 @@ node::calculate_cid(const string_view data, Cancel& cancel, Token&& token)
 }
 
 template<class Token>
+inline typename node::Result<Token, std::vector<uint8_t>>::return_type
+node::cat(const std::string& cid, Cancel& cancel, Token&& token)
+{
+    Handler<Token, std::vector<uint8_t>> handler(std::forward<Token>(token));
+    Result<Token, std::vector<uint8_t>> result(handler);
+    cat_(cid, nullptr, std::move(handler));
+    return result.get();
+}
+
+template<class Token>
 inline
-typename node::Result<Token, std::string>::type
+typename node::Result<Token, std::string>::return_type
 node::cat(string_view cid, Token&& token)
 {
     Handler<Token, std::string> handler(std::forward<Token>(token));
@@ -275,7 +290,7 @@ node::cat(string_view cid, Token&& token)
 
 template<class Token>
 inline
-typename node::Result<Token, std::string>::type
+typename node::Result<Token, std::string>::return_type
 node::cat(string_view cid, Cancel& cancel, Token&& token)
 {
     Handler<Token, std::string> handler(std::forward<Token>(token));
@@ -308,7 +323,7 @@ node::publish(const std::string& cid, Timer::duration d, Cancel& cancel, Token&&
 
 template<class Token>
 inline
-typename node::Result<Token, std::string>::type
+typename node::Result<Token, std::string>::return_type
 node::resolve(const std::string& ipns_id, Token&& token)
 {
     Handler<Token, std::string> handler(std::forward<Token>(token));
@@ -319,7 +334,7 @@ node::resolve(const std::string& ipns_id, Token&& token)
 
 template<class Token>
 inline
-typename node::Result<Token, std::string>::type
+typename node::Result<Token, std::string>::return_type
 node::resolve(const std::string& ipns_id, Cancel& cancel, Token&& token)
 {
     Handler<Token, std::string> handler(std::forward<Token>(token));
