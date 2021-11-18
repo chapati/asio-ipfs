@@ -18,6 +18,7 @@ import (
 	core "github.com/ipfs/go-ipfs/core"
 	coreapi "github.com/ipfs/go-ipfs/core/coreapi"
 	coreiface "github.com/ipfs/interface-go-ipfs-core"
+	corepath "github.com/ipfs/interface-go-ipfs-core/path"
 	corehttp "github.com/ipfs/go-ipfs/core/corehttp"
 	repo "github.com/ipfs/go-ipfs/repo"
 	fsrepo "github.com/ipfs/go-ipfs/repo/fsrepo"
@@ -30,7 +31,7 @@ import (
 	"github.com/ipfs/interface-go-ipfs-core/options"
 
 	path "github.com/ipfs/go-path"
-	peer "github.com/libp2p/go-libp2p-peer"
+	// peer "github.com/libp2p/go-libp2p-peer" causes deprecate error
 	files "github.com/ipfs/go-ipfs-files"
 
 	mprome "github.com/ipfs/go-metrics-prometheus"
@@ -102,19 +103,25 @@ func doesnt_exist_or_is_empty(path string) bool {
 	return false
 }
 
+
 // "/ip4/0.0.0.0/tcp/4001" -> "/ip4/0.0.0.0/tcp/0"
 // "/ip6/::/tcp/4001"      -> "/ip6/::/tcp/0"
 func setRandomPort(ep string) string {
+    fmt.Printf("addr %s\n", ep)
 	parts := strings.Split(ep, "/")
 	l := len(parts);
-	if l == 0 { return ep }
-	parts[l-1] = "0"
+	for i := 0; i < l; i++ {
+	    if parts[i] == "4001" {
+	        parts[i] = "0"
+	    }
+	}
 	return strings.Join(parts, "/")
 }
 
 func openOrCreateRepo(repoRoot string, c Config) (repo.Repo, error) {
 	if doesnt_exist_or_is_empty(repoRoot) {
 		conf, err := config.Init(os.Stdout, nBitsForKeypair)
+		//fmt.Printf("%v", conf);
 
 		if err != nil {
 			return nil, err
@@ -127,18 +134,39 @@ func openOrCreateRepo(repoRoot string, c Config) (repo.Repo, error) {
 			conf.Addresses.Swarm[i] = setRandomPort(addr)
 		}
 
-		if (enableQuic) {
-			conf.Experimental.QUIC = true
-			conf.Addresses.Swarm = append(conf.Addresses.Swarm, "/ip4/0.0.0.0/udp/0/quic")
-		}
+        // TODO:IPFS check if QUIC is already in conf.Addresses
+		//if (enableQuic) {
+		//	conf.Experimental.QUIC = true
+		//	conf.Addresses.Swarm = append(conf.Addresses.Swarm, "/ip4/0.0.0.0/udp/0/quic")
+		//}
 
 		conf.Swarm.ConnMgr.LowWater = c.LowWater
 		conf.Swarm.ConnMgr.HighWater = c.HighWater
 		conf.Swarm.ConnMgr.GracePeriod = c.GracePeriod
 
+		// TODO:IPFS pass bootstrap from outside
+		// TODO:IPFS /dnsaddr/
+		// TODO:IPFS change to default ports
+		// TODO:IPFS api server & web ui?
+		// TODO:IPFS why pins are not shown in web UI?
+		// TODO:IPFS ensure we're not on a public network, what is indirect pin?
+		// TODO:IPFS & setenforce
+		var BEAMBootstrap = []string{
+        	"/ip4/3.19.141.112/tcp/38041/p2p/12D3KooWAEVvU2TTdZTKreAERsjFwpJRvHgqrEeiYu7AsXFFiHuf",  // masternet
+        	"/ip4/3.19.141.112/udp/37437/quic/p2p/12D3KooWAEVvU2TTdZTKreAERsjFwpJRvHgqrEeiYu7AsXFFiHuf",
+        }
+
+        ps, err :=  config.ParseBootstrapPeers(BEAMBootstrap)
+        if err != nil {
+        		return nil, fmt.Errorf(`failed to parse hardcoded BEAM bootstrap peers: %s
+This is a problem with the ipfs codebase. Please report it to the dev team`, err)
+      	}
+
+		conf.Bootstrap =  config.BootstrapPeerStrings(ps)
+
 		if err := fsrepo.Init(repoRoot, conf); err != nil {
-			return nil, err
-		}
+            return nil, err
+        }
 	}
 
 	return fsrepo.Open(repoRoot)
@@ -203,7 +231,7 @@ func go_asio_ipfs_free(handle uint64) {
 //export go_asio_ipfs_cancellation_allocate
 func go_asio_ipfs_cancellation_allocate(handle uint64) C.uint64_t {
 	n, ok := g_nodes[handle]
-	if !ok { return C.uint64_t(1<<64 - 1 /* max uint64 */) }
+	if !ok { return C.uint64_t(1<<64 - 1) } // max uint64
 
 	ret := n.next_cancel_signal_id
 	n.next_cancel_signal_id += 1
@@ -251,7 +279,6 @@ func loadPlugins(plugins []plugin.Plugin) bool {
 }
 
 func start_node(cfg_json string, n *Node, repoRoot string) C.int {
-
 	var c Config
 	err := json.Unmarshal([]byte(cfg_json), &c)
 
@@ -284,15 +311,25 @@ func start_node(cfg_json string, n *Node, repoRoot string) C.int {
 
 	cfg, err := fsrepo.ConfigAt(repoRoot);
 
+    start := time.Now()
 	n.node, err = core.NewNode(n.ctx, &core.BuildCfg{
-		Online: c.Online,
-		Permanent: true,
-		Repo:   r,
-		ExtraOpts: map[string]bool{
-			"ipnsps": enablePubSubIPNS,
-		},
-	})
+       Online: c.Online,
+       Permanent: true,
+       Repo:   r,
+       ExtraOpts: map[string]bool{
+           "ipnsps": enablePubSubIPNS,
+       },
+   })
 
+   if err != nil {
+       fmt.Println("err", err);
+       return C.IPFS_FAILED_TO_START_NODE
+   }
+
+	elapsed := time.Since(start)
+    fmt.Println("IPFS core.NewNode startup time:", elapsed)
+
+    // TODO:IPFS do we need this?
 	n.node.IsDaemon = true
 
 	printSwarmAddrs(n.node)
@@ -348,6 +385,12 @@ func go_asio_ipfs_start_async(handle uint64, c_cfg *C.char, c_repoPath *C.char, 
 // IMPORTANT: The returned value needs to be explicitly `free`d.
 //export go_asio_ipfs_node_id
 func go_asio_ipfs_node_id(handle uint64) *C.char {
+    //TODO:IPFS
+    /*  uncommenting code below causes
+        key_deprecated.go:68:22: undefined: "github.com/libp2p/go-libp2p-core/crypto".StretchedKeys
+        key_deprecated.go:72:9: undefined: "github.com/libp2p/go-libp2p-core/crypto".KeyStretcher
+        it is not necessary for now
+
 	var n = g_nodes[handle]
 
 	pid, err := peer.IDFromPrivateKey(n.node.PrivateKey)
@@ -357,12 +400,16 @@ func go_asio_ipfs_node_id(handle uint64) *C.char {
 	}
 
 	cstr := C.CString(pid.Pretty())
+	return cstr*/
+	cstr := C.CString("TODO")
 	return cstr
 }
 
 //export go_asio_ipfs_resolve
 func go_asio_ipfs_resolve(handle uint64, cancel_signal C.uint64_t, c_ipns_id *C.char, fn unsafe.Pointer, fn_arg unsafe.Pointer) {
-	var n = g_nodes[handle]
+	// Doesn't compile after v0.4 -> v0.10
+	// Commented since is not necessary for now
+	/*var n = g_nodes[handle]
 
 	ipns_id := C.GoString(c_ipns_id)
 
@@ -389,7 +436,7 @@ func go_asio_ipfs_resolve(handle uint64, cancel_signal C.uint64_t, c_ipns_id *C.
 		defer C.free(cdata)
 
 		C.execute_data_cb(fn, C.IPFS_SUCCESS, cdata, C.size_t(len(data)), fn_arg)
-	}()
+	}()*/
 }
 
 func publish(ctx context.Context, duration time.Duration, n *core.IpfsNode, cid string) error {
@@ -489,14 +536,7 @@ func go_asio_ipfs_cat(handle uint64, cancel_signal C.uint64_t, c_cid *C.char, fn
 			defer fmt.Println("go_asio_ipfs_cat end");
 		}
 
-		path, err := coreiface.ParsePath(cid);
-
-		if err != nil {
-			fmt.Printf("go_asio_ipfs_cat failed to parse cid %q\n", err);
-			C.execute_data_cb(fn, C.IPFS_CAT_FAILED, nil, C.size_t(0), fn_arg)
-			return
-		}
-
+		path := corepath.New(cid)
 		f, err := n.api.Unixfs().Get(cancel_ctx, path)
 
 		if err != nil {
@@ -550,15 +590,8 @@ func go_asio_ipfs_pin(handle uint64, cancel_signal C.uint64_t, c_cid *C.char, fn
 			defer fmt.Println("go_asio_ipfs_pin end");
 		}
 
-		path, err := coreiface.ParsePath(cid)
-
-		if err != nil {
-			fmt.Printf("go_asio_ipfs_pin failed to pin %q %q\n", cid, err)
-			C.execute_void_cb(fn, C.IPFS_PIN_FAILED, fn_arg)
-			return
-		}
-
-		err = n.api.Pin().Add(cancel_ctx, path)
+		path := corepath.New(cid)
+		err := n.api.Pin().Add(cancel_ctx, path)
 
 		if err != nil {
 			fmt.Printf("go_asio_ipfs_pin failed to pin %q %q\n", cid, err)
@@ -584,15 +617,8 @@ func go_asio_ipfs_unpin(handle uint64, cancel_signal C.uint64_t, c_cid *C.char, 
 			defer fmt.Println("go_asio_ipfs_unpin end");
 		}
 
-		path, err := coreiface.ParsePath(cid)
-
-		if err != nil {
-			fmt.Printf("go_asio_ipfs_pin failed to unpin %q %q\n", cid, err)
-			C.execute_void_cb(fn, C.IPFS_PIN_FAILED, fn_arg)
-			return
-		}
-
-		err = n.api.Pin().Rm(cancel_ctx, path)
+		path := corepath.New(cid)
+		err := n.api.Pin().Rm(cancel_ctx, path)
 
 		if err != nil {
 			fmt.Printf("go_asio_ipfs_unpin failed to unpin %q %q\n", cid, err);
@@ -603,4 +629,3 @@ func go_asio_ipfs_unpin(handle uint64, cancel_signal C.uint64_t, c_cid *C.char, 
 		C.execute_void_cb(fn, C.IPFS_SUCCESS, fn_arg)
 	}()
 }
-

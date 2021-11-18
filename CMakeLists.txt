@@ -19,8 +19,8 @@ find_package(Boost ${BOOST_VERSION} REQUIRED COMPONENTS
 if(NOT TARGET golang)
     set(GOROOT "${CMAKE_CURRENT_BINARY_DIR}/golang")
     externalproject_add(golang
-        URL https://dl.google.com/go/go1.12.3.linux-amd64.tar.gz
-        URL_MD5 eac797050ce084d444a49e8d68ad13b7
+        URL https://dl.google.com/go/go1.16.10.linux-amd64.tar.gz
+        URL_HASH SHA256=414cd18ce1d193769b9e97d2401ad718755ab47816e13b2a1cde203d263b55cf
         CONFIGURE_COMMAND ""
         BUILD_COMMAND ""
         INSTALL_COMMAND ""
@@ -95,6 +95,7 @@ add_custom_command(
          && cd ${GOPATH}/src/github.com/equalitie/asio-ipfs
          && rsync -r ${CMAKE_CURRENT_SOURCE_DIR}/include ${CMAKE_CURRENT_SOURCE_DIR}/src .
          && cp ${CMAKE_CURRENT_SOURCE_DIR}/go.mod ./
+         && cp ${CMAKE_CURRENT_SOURCE_DIR}/go.sum ./
          && go build -ldflags '-extldflags -Wl,-soname,libipfs_bindings.so'
                      --buildmode=c-shared
                      -o ${BINDINGS_DIR}/ipfs_bindings.so
