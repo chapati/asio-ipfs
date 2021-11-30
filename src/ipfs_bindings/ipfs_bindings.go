@@ -15,6 +15,7 @@ import (
 	"strings"
 	"io/ioutil"
 	"encoding/json"
+	"path/filepath"
 	core "github.com/ipfs/go-ipfs/core"
 	coreapi "github.com/ipfs/go-ipfs/core/coreapi"
 	coreiface "github.com/ipfs/interface-go-ipfs-core"
@@ -151,9 +152,9 @@ func openOrCreateRepo(repoRoot string, c Config) (repo.Repo, error) {
 		// TODO:IPFS why pins are not shown in web UI?
 		// TODO:IPFS ensure we're not on a public network, what is indirect pin?
 		// TODO:IPFS & setenforce
+		// TODO:IPFS PASS SWARM KEY
 		var BEAMBootstrap = []string{
-        	"/ip4/3.19.141.112/tcp/38041/p2p/12D3KooWAEVvU2TTdZTKreAERsjFwpJRvHgqrEeiYu7AsXFFiHuf",  // masternet
-        	"/ip4/3.19.141.112/udp/37437/quic/p2p/12D3KooWAEVvU2TTdZTKreAERsjFwpJRvHgqrEeiYu7AsXFFiHuf",
+        	"/ip4/3.19.141.112/tcp/38041/p2p/12D3KooWFrigFK9gVvCr7YDNNAAxDxmeyLDtR1tYvHcaXxuCcKpt",  // masternet
         }
 
         ps, err :=  config.ParseBootstrapPeers(BEAMBootstrap)
@@ -165,6 +166,21 @@ This is a problem with the ipfs codebase. Please report it to the dev team`, err
 		conf.Bootstrap =  config.BootstrapPeerStrings(ps)
 
 		if err := fsrepo.Init(repoRoot, conf); err != nil {
+            return nil, err
+        }
+
+        // Manually add swarm key
+        repoPath := filepath.Clean(repoRoot)
+        spath := filepath.Join(repoPath, "swarm.key")
+
+        f, err := os.Create(spath)
+        if err != nil {
+            return nil, err
+        }
+        defer f.Close()
+
+        _, err = f.WriteString("/key/swarm/psk/1.0.0/\n/base16/\n1191aea7c9f99f679f477411d9d44f1ea0fdf5b42d995966b14a9000432f8c4a")
+        if err != nil {
             return nil, err
         }
 	}
@@ -337,13 +353,29 @@ func start_node(cfg_json string, n *Node, repoRoot string) C.int {
 	prometheus.MustRegister(&corehttp.IpfsNodeCollector{Node: n.node})
 
 	api, err := coreapi.NewCoreAPI(n.node)
-
 	if err != nil {
 		fmt.Println("err", err);
 		return C.IPFS_FAILED_TO_CREATE_REPO
 	}
 
+	// Print peers
+	peers, err := api.Swarm().Peers(n.node.Context())
+	if err != nil {
+        fmt.Println("failed to read swarm peers:", err)
+        return C.IPFS_FAILED_TO_START_NODE
+    }
+
+    // TODO:IPFS print this every several minutes
+    if len(peers) == 0 {
+        fmt.Println("WARNING: IPFS has no peers")
+    } else {
+        for _, peer := range peers {
+            fmt.Printf("IPFS Peer %v %v\n", peer.ID().Pretty(), peer.Address().String())
+        }
+    }
+
 	go func() {
+	    // TODO:IPFS do we need this?
 		apiAddr := cfg.Addresses.API[0]
 		err := corehttp.ListenAndServe(n.node, apiAddr, corehttp.MetricsScrapingOption("/debug/metrics/prometheus"))
 
@@ -353,7 +385,6 @@ func start_node(cfg_json string, n *Node, repoRoot string) C.int {
 	}()
 
 	n.api = api
-
 	return C.IPFS_SUCCESS
 }
 
