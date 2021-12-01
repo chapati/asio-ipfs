@@ -9,5 +9,6 @@ require (
 	github.com/ipfs/go-metrics-prometheus v0.0.2
 	github.com/ipfs/go-path v0.1.2
 	github.com/ipfs/interface-go-ipfs-core v0.5.1
+	github.com/multiformats/go-multiaddr v0.4.0 // indirect
 	github.com/prometheus/client_golang v1.11.0
 )

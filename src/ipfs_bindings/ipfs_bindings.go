@@ -26,7 +26,8 @@ import (
 	plugin "github.com/ipfs/go-ipfs/plugin"
 	flatfs "github.com/ipfs/go-ipfs/plugin/plugins/flatfs"
 	levelds "github.com/ipfs/go-ipfs/plugin/plugins/levelds"
-
+    oldcmds "github.com/ipfs/go-ipfs/commands"
+    ma "github.com/multiformats/go-multiaddr"
 
 	"github.com/ipfs/go-ipfs-config"
 	"github.com/ipfs/interface-go-ipfs-core/options"
@@ -310,6 +311,7 @@ func start_node(cfg_json string, n *Node, repoRoot string) C.int {
 		return C.IPFS_FAILED_TO_CREATE_REPO // FIXME
 	}
 
+    // TODO:IPFS check how plugins are started in https://github.com/ipfs/go-ipfs/blob/029d82c4ea9d73f485b30e5f5100c86502308375/cmd/ipfs/daemon.go
 	pr1 := loadPlugins(flatfs.Plugins);
 	pr2 := loadPlugins(levelds.Plugins);
 
@@ -375,10 +377,36 @@ func start_node(cfg_json string, n *Node, repoRoot string) C.int {
     }
 
 	go func() {
+	    cctx := oldcmds.Context {
+	        ConfigRoot: repoRoot,
+	        ReqLog: &oldcmds.ReqLog{},
+	        ConstructNode: func() (*core.IpfsNode, error) {
+                return n.node, nil
+            },
+            // TODO:IPFS https://github.com/ipfs/go-ipfs/blob/ef866a1400b3b2861e5e8b6cc9edc8633b890a0a/cmd/ipfs/main.go
+            // LoadConfig
+            // Plugins:
+	    }
+
+        opts := []corehttp.ServeOption{
+            corehttp.CommandsOption(cctx),
+            corehttp.MetricsScrapingOption("/debug/metrics/prometheus"),
+            corehttp.LogOption(),
+        }
 	    // TODO:IPFS do we need this?
 		apiAddr := cfg.Addresses.API[0]
-		err := corehttp.ListenAndServe(n.node, apiAddr, corehttp.MetricsScrapingOption("/debug/metrics/prometheus"))
+		apiMAddr, err := ma.NewMultiaddr(apiAddr)
 
+		if err != nil {
+		    // IPFS:TODO fail / check serveHTTPApi in daemon.go
+        	fmt.Printf("serveHTTPApi: invalid API address: %q (err: %s)", apiAddr, err)
+        }
+
+		if err = n.node.Repo.SetAPIAddr(apiMAddr); err != nil {
+        	fmt.Printf("serveHTTPApi: SetAPIAddr() failed: %s\n", err)
+        }
+
+		err = corehttp.ListenAndServe(n.node, apiAddr, opts... )
 		if err != nil {
 			fmt.Printf("Warning: failed to start API listener on %s\n", apiAddr);
 		}
