@@ -325,6 +325,11 @@ void node::unpin_( const string& cid
     call_ipfs(_impl.get(), cancel, cb, go_asio_ipfs_unpin, (char*) cid.data());
 }
 
+void node::gc_(Cancel* cancel, std::function<void(boost::system::error_code)> cb)
+{
+    call_ipfs(_impl.get(), cancel, cb, go_asio_ipfs_gc);
+}
+
 boost::asio::io_service& node::get_io_service()
 {
     return _impl->ios;

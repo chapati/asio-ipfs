@@ -18,6 +18,7 @@ import (
 	"path/filepath"
 	core "github.com/ipfs/go-ipfs/core"
 	coreapi "github.com/ipfs/go-ipfs/core/coreapi"
+	corerepo "github.com/ipfs/go-ipfs/core/corerepo"
 	coreiface "github.com/ipfs/interface-go-ipfs-core"
 	corepath "github.com/ipfs/interface-go-ipfs-core/path"
 	corehttp "github.com/ipfs/go-ipfs/core/corehttp"
@@ -27,6 +28,7 @@ import (
 	flatfs "github.com/ipfs/go-ipfs/plugin/plugins/flatfs"
 	levelds "github.com/ipfs/go-ipfs/plugin/plugins/levelds"
     oldcmds "github.com/ipfs/go-ipfs/commands"
+    cid "github.com/ipfs/go-cid"
     ma "github.com/multiformats/go-multiaddr"
 
 	"github.com/ipfs/go-ipfs-config"
@@ -136,6 +138,7 @@ func openOrCreateRepo(repoRoot string, c Config) (repo.Repo, error) {
 			conf.Addresses.Swarm[i] = setRandomPort(addr)
 		}
 
+        // TODO:IPFS check --enable-gc
         // TODO:IPFS check if QUIC is already in conf.Addresses
 		//if (enableQuic) {
 		//	conf.Experimental.QUIC = true
@@ -687,4 +690,23 @@ func go_asio_ipfs_unpin(handle uint64, cancel_signal C.uint64_t, c_cid *C.char, 
 
 		C.execute_void_cb(fn, C.IPFS_SUCCESS, fn_arg)
 	}()
+}
+
+//export go_asio_ipfs_gc
+func go_asio_ipfs_gc(handle uint64, cancel_signal C.uint64_t, fn unsafe.Pointer, fn_arg unsafe.Pointer) {
+    var n = g_nodes[handle]
+    cancel_ctx := withCancel(n, cancel_signal)
+
+    go func() {
+        gcOutChan := corerepo.GarbageCollectAsync(n.node, cancel_ctx)
+        err := corerepo.CollectResult(cancel_ctx, gcOutChan, func(k cid.Cid) {})
+
+        if err != nil {
+            fmt.Printf("go_asio_ipfs_gc failed %q\n", err);
+            C.execute_void_cb(fn, C.IPFS_GC_FAILED, fn_arg)
+            return
+        }
+
+        C.execute_void_cb(fn, C.IPFS_SUCCESS, fn_arg)
+    }()
 }

@@ -122,8 +122,10 @@ public:
     void
     unpin(const std::string& cid, Cancel&, Token&&);
 
-    boost::asio::io_service& get_io_service();
+    template<class Token>
+    void gc(Cancel&, Token&&);
 
+    boost::asio::io_service& get_io_service();
     ~node();
 
 private:
@@ -170,6 +172,9 @@ private:
     void unpin_( const std::string& cid
                , Cancel*
                , std::function<void(boost::system::error_code)>);
+
+    void gc_(Cancel*
+             , std::function<void(boost::system::error_code)>);
 
 private:
     std::unique_ptr<node_impl> _impl;
@@ -384,6 +389,15 @@ node::unpin(const std::string& cid, Cancel& cancel, Token&& token)
     Handler<Token> handler(std::forward<Token>(token));
     Result<Token> result(handler);
     unpin_(cid, &cancel, std::move(handler));
+    return result.get();
+}
+
+template<class Token>
+void node::gc(Cancel& cancel, Token&& token)
+{
+    Handler<Token> handler(std::forward<Token>(token));
+    Result<Token> result(handler);
+    gc_(&cancel, std::move(handler));
     return result.get();
 }
 

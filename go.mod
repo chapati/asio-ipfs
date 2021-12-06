@@ -3,6 +3,7 @@ module github.com/equalitie/asio-ipfs
 go 1.12
 
 require (
+	github.com/ipfs/go-cid v0.0.7 // indirect
 	github.com/ipfs/go-ipfs v0.10.0
 	github.com/ipfs/go-ipfs-config v0.16.0
 	github.com/ipfs/go-ipfs-files v0.0.8

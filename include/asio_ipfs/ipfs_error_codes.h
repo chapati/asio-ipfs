@@ -14,7 +14,8 @@
 #define IPFS_READ_FAILED             6  // failed to read data
 #define IPFS_PUBLISH_FAILED          7  // failed to publish CID
 #define IPFS_PIN_FAILED              8  // failed to publish CID
-#define IPFS_UNPIN_FAILED            9  // failed to publish CID
+#define IPFS_UNPIN_FAILED            9  // failed to unpin CID
+#define IPFS_GC_FAILED              10  // failed to garbage collect
 
 
 #endif  // ndef GUARD_ipfs_error_codes_h
