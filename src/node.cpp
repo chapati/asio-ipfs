@@ -186,7 +186,7 @@ static string config_to_json(config cfg)
         {"Online",      cfg.online},
         {"LowWater",    cfg.low_water},
         {"HighWater",   cfg.high_water},
-        {"GracePeriod", std::to_string(cfg.grace_period)},
+        {"GracePeriod", std::to_string(cfg.grace_period) + std::string("s")},
         {"Bootstrap",   cfg.bootstrap}
     };
 

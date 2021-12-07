@@ -119,8 +119,6 @@ add_custom_command(
 )
 add_custom_target(ipfs-bindings DEPENDS ${BINDINGS_OUTPUT})
 
-
-
 ################################################################################
 file(GLOB sources "./src/*.cpp")
 add_library(asio-ipfs STATIC ${sources})
