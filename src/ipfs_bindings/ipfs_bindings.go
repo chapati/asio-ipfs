@@ -81,10 +81,11 @@ const (
 )
 
 type Config struct {
-	Online bool
-	LowWater int
-	HighWater int
-	GracePeriod string
+	Online      bool     `json:"online"`
+	LowWater    int      `json:"low_water"`
+	HighWater   int      `json:"high_water"`
+	GracePeriod string   `json:"grace_period"`
+	Bootstrap   []string `json:"bootstrap"`
 }
 
 func main() {
@@ -144,12 +145,26 @@ func openOrCreateRepo(repoRoot string, c Config) (repo.Repo, error) {
 		//	conf.Experimental.QUIC = true
 		//	conf.Addresses.Swarm = append(conf.Addresses.Swarm, "/ip4/0.0.0.0/udp/0/quic")
 		//}
-
 		conf.Swarm.ConnMgr.LowWater = c.LowWater
 		conf.Swarm.ConnMgr.HighWater = c.HighWater
 		conf.Swarm.ConnMgr.GracePeriod = c.GracePeriod
 
-		// TODO:IPFS pass bootstrap from outside
+        //
+        // Bootstrap peers
+        //
+        {
+            if len (c.Bootstrap) == 0 {
+                return nil, fmt.Errorf("Config.Bootstrap cannot be empty")
+            }
+
+            ps, err :=  config.ParseBootstrapPeers(c.Bootstrap)
+            if err != nil {
+                return nil, fmt.Errorf("Failed to parse bootstrap peers: %s", err)
+            }
+
+            conf.Bootstrap = config.BootstrapPeerStrings(ps)
+        }
+
 		// TODO:IPFS /dnsaddr/
 		// TODO:IPFS change to default ports
 		// TODO:IPFS api server & web ui?
@@ -157,18 +172,6 @@ func openOrCreateRepo(repoRoot string, c Config) (repo.Repo, error) {
 		// TODO:IPFS ensure we're not on a public network, what is indirect pin?
 		// TODO:IPFS & setenforce
 		// TODO:IPFS PASS SWARM KEY
-		var BEAMBootstrap = []string{
-        	"/ip4/3.19.141.112/tcp/38041/p2p/12D3KooWFrigFK9gVvCr7YDNNAAxDxmeyLDtR1tYvHcaXxuCcKpt",  // masternet
-        }
-
-        ps, err :=  config.ParseBootstrapPeers(BEAMBootstrap)
-        if err != nil {
-        		return nil, fmt.Errorf(`failed to parse hardcoded BEAM bootstrap peers: %s
-This is a problem with the ipfs codebase. Please report it to the dev team`, err)
-      	}
-
-		conf.Bootstrap =  config.BootstrapPeerStrings(ps)
-
 		if err := fsrepo.Init(repoRoot, conf); err != nil {
             return nil, err
         }

@@ -1,12 +1,13 @@
 #include <ipfs_bindings.h>
 #include <asio_ipfs/error.h>
-#include <assert.h>
+#include <cassert>
 #include <experimental/tuple>
 #include <boost/intrusive/list.hpp>
 #include <boost/optional.hpp>
 #include <sstream>
-
+#include <nlohmann/json.hpp>
 #include <asio_ipfs.h>
+#include <iostream>
 
 using namespace asio_ipfs;
 using namespace std;
@@ -20,7 +21,7 @@ template<class F> Defer<F> defer(F&& f) { return Defer<F>{forward<F>(f)}; }
 struct HandleBase : public intr::list_base_hook
                             <intr::link_mode<intr::auto_unlink>> {
     virtual void cancel() = 0;
-    virtual ~HandleBase() { }
+    virtual ~HandleBase() = default;
 };
 
 struct asio_ipfs::node_impl {
@@ -28,12 +29,10 @@ struct asio_ipfs::node_impl {
     asio::io_service& ios;
     intr::list<HandleBase, intr::constant_time_size<false>> handles;
 
-    node_impl(asio::io_service& ios)
+    explicit node_impl(asio::io_service& ios)
         : ios(ios)
     {}
 };
-
-
 
 template<class... As>
 struct Handle : public HandleBase {
@@ -63,7 +62,7 @@ struct Handle : public HandleBase {
             if (cancel_signal_id) {
                 go_asio_ipfs_cancellation_free(ipfs_handle, *cancel_signal_id);
             }
-            // We need to unlink here, othersize the callback could invoke the
+            // We need to unlink here, otherwise the callback could invoke the
             // destructor, which would in turn call `cancel` and expect that it
             // gets unlinked. But we just set the `cancel_fn` to do nothing
             // above, so the destructor ends up in an infinite loop.
@@ -175,20 +174,23 @@ void call_ipfs_nocancel(
     );
 }
 
-static
-string config_to_json(node::config cfg)
+static string config_to_json(config cfg)
 {
-    stringstream ss;
+    if (cfg.bootstrap.empty())
+    {
+        throw std::runtime_error("IPFS bootstrap cannot be empty");
+    }
 
-    // Poor man's json
-    ss << "{"
-       <<     "\"Online\": " << (cfg.online ? "true" : "false") << ","
-       <<     "\"LowWater\": " << cfg.low_water << ","
-       <<     "\"HighWater\": " << cfg.high_water << ","
-       <<     "\"GracePeriod\": \"" << cfg.grace_period << "s\""
-       << "}";
+    auto json = nlohmann::json
+    {
+        {"Online",      cfg.online},
+        {"LowWater",    cfg.low_water},
+        {"HighWater",   cfg.high_water},
+        {"GracePeriod", std::to_string(cfg.grace_period)},
+        {"Bootstrap",   cfg.bootstrap}
+    };
 
-    return ss.str();
+    return json.dump();
 }
 
 node::node(asio::io_service& ios, const string& repo_path, config cfg)

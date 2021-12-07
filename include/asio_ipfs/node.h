@@ -6,6 +6,7 @@
 #include <boost/asio/steady_timer.hpp>
 #include <boost/asio/io_service.hpp>
 #include <boost/utility/string_view.hpp>
+#include "config.h"
 
 namespace asio_ipfs {
 
@@ -25,13 +26,6 @@ class node {
 
 public:
     static const uint32_t CID_SIZE = 46;
-
-    struct config {
-        bool         online       = true;
-        unsigned int low_water    = 600;
-        unsigned int high_water   = 900;
-        unsigned int grace_period = 20; // seconds
-    };
 
 public:
     // This constructor may do repository initialization disk IO and as such
