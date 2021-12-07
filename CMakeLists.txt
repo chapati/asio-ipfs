@@ -16,11 +16,21 @@ find_package(Boost ${BOOST_VERSION} REQUIRED COMPONENTS
     system
 )
 
+if(("${CMAKE_SYSTEM_NAME}" STREQUAL "Linux") AND ("${CMAKE_SYSTEM_PROCESSOR}" STREQUAL "x86_64"))
+    set(GOSRC "https://dl.google.com/go/go1.16.10.linux-amd64.tar.gz")
+    set(GOSRC_HASH "414cd18ce1d193769b9e97d2401ad718755ab47816e13b2a1cde203d263b55cf")
+elseif(("${CMAKE_SYSTEM_NAME}" STREQUAL "Windows") AND ("${CMAKE_SYSTEM_PROCESSOR}" STREQUAL "AMD64"))
+    set(GOSRC "https://dl.google.com/go/go1.16.10.windows-amd64.zip")
+    set(GOSRC_HASH "787c9afbcd7446874f79bffd20dc4219c3aeff6731bd03f09058bdd546c7eb87")
+else()
+    message(FATAL_ERROR "To continue set golang source for ${CMAKE_SYSTEM_NAME}/${CMAKE_SYSTEM_PROCESSOR} manually")
+endif()
+
 if(NOT TARGET golang)
     set(GOROOT "${CMAKE_CURRENT_BINARY_DIR}/golang")
     externalproject_add(golang
-        URL https://dl.google.com/go/go1.16.10.linux-amd64.tar.gz
-        URL_HASH SHA256=414cd18ce1d193769b9e97d2401ad718755ab47816e13b2a1cde203d263b55cf
+        URL ${GOSRC}
+        URL_HASH SHA256=${GOSRC_HASH}
         CONFIGURE_COMMAND ""
         BUILD_COMMAND ""
         INSTALL_COMMAND ""
@@ -36,7 +46,7 @@ elseif("${CMAKE_SYSTEM_NAME}" STREQUAL "Windows")
 elseif("${CMAKE_SYSTEM_NAME}" STREQUAL "Android")
     set(GOOS "android")
 else()
-    message(FATAL_ERROR "unsupported system name ${CMAKE_SYSTEM_NAME}")
+    message(FATAL_ERROR "unknown system name ${CMAKE_SYSTEM_NAME}")
 endif()
 
 # Convert system processor into GOARCH (and maybe GOARM).
@@ -55,7 +65,7 @@ elseif("${CMAKE_SYSTEM_PROCESSOR}" MATCHES "^arm.*")
     set(GOARCH "arm")
     set(GOARM "5")
 else()
-    message(FATAL_ERROR "unsupported system processor ${CMAKE_SYSTEM_PROCESSOR}")
+    message(FATAL_ERROR "unknown system processor ${CMAKE_SYSTEM_PROCESSOR}")
 endif()
 
 ################################################################################
