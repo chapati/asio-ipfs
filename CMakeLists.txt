@@ -31,6 +31,8 @@ endif()
 # Convert system name into GOOS.
 if("${CMAKE_SYSTEM_NAME}" STREQUAL "Linux")
     set(GOOS "linux")
+elseif("${CMAKE_SYSTEM_NAME}" STREQUAL "Windows")
+    set(GOOS "windows")
 elseif("${CMAKE_SYSTEM_NAME}" STREQUAL "Android")
     set(GOOS "android")
 else()
