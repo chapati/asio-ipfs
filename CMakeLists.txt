@@ -42,6 +42,8 @@ endif()
 # Convert system processor into GOARCH (and maybe GOARM).
 if("${CMAKE_SYSTEM_PROCESSOR}" STREQUAL "x86_64")
     set(GOARCH "amd64")
+elseif("${CMAKE_SYSTEM_PROCESSOR}" STREQUAL "AMD64")
+    set(GOARCH "amd64")
 elseif("${CMAKE_SYSTEM_PROCESSOR}" STREQUAL "i686")
     set(GOARCH "386")
 elseif("${CMAKE_SYSTEM_PROCESSOR}" STREQUAL "aarch64")
