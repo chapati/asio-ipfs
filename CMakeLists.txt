@@ -1,175 +1,265 @@
-cmake_minimum_required (VERSION 3.5)
-################################################################################
+# TODO:IPFS support non-ipfs version of api, needed for ethash_service
+# TODO:IPFS non-ipfs version of wallet-api
+# TODO:IPFS MacOS
+# TODO:IPFS Android ?
+# TODO:IPFS WebAssembly (switch off)
+# TODO:IPFS Arm?
+cmake_minimum_required (VERSION 3.13)
 
-# NOTE: from_iso_extended_string has been introduced in Boost 1.62
-set(BOOST_VERSION 1.62)
+project(asio-ipfs)
 include(ExternalProject)
 
-option(ASIO_IPFS_WITH_EXAMPLE_BINARIES "Build with example binaries" ON)
-
-################################################################################
-project(asio-ipfs)
-
-find_package(Threads)
+#
+# Boost
+#
+set(BOOST_VERSION 1.62)
 find_package(Boost ${BOOST_VERSION} REQUIRED COMPONENTS
     coroutine
     system
 )
 
-if(("${CMAKE_SYSTEM_NAME}" STREQUAL "Linux") AND ("${CMAKE_SYSTEM_PROCESSOR}" STREQUAL "x86_64"))
-    set(GOSRC "https://dl.google.com/go/go1.16.10.linux-amd64.tar.gz")
-    set(GOSRC_HASH "414cd18ce1d193769b9e97d2401ad718755ab47816e13b2a1cde203d263b55cf")
-elseif(("${CMAKE_SYSTEM_NAME}" STREQUAL "Windows") AND ("${CMAKE_SYSTEM_PROCESSOR}" STREQUAL "AMD64"))
-    set(GOSRC "https://dl.google.com/go/go1.16.10.windows-amd64.zip")
-    set(GOSRC_HASH "787c9afbcd7446874f79bffd20dc4219c3aeff6731bd03f09058bdd546c7eb87")
+#
+# Detect platform & arch. We do not support cross-compilation 
+# so we assume that CMAKE_SYSTEM_NAME and CMAKE_HOST_SYSTEM_NAME are the same
+# as well as CMAKE_HOST_SYSTEM_PROCESSOR and CMAKE_SYSTEM_PROCESSOR
+#
+if ("${CMAKE_SYSTEM_NAME}" STREQUAL "Linux")
+    set(LINUX TRUE)
+    
+    if ("${CMAKE_SYSTEM_PROCESSOR}" STREQUAL "x86_64")
+        set(LINUX64 TRUE)
+        set(X64 TRUE)
+    else()
+         message(FATAL_ERROR "Unsupported host architecture ${CMAKE_SYSTEM_PROCESSOR}")
+    endif()
+
+elseif("${CMAKE_SYSTEM_NAME}" STREQUAL "Windows")
+    set(WIN TRUE)
+    
+    if ("${CMAKE_SYSTEM_PROCESSOR}" STREQUAL "AMD64")
+        set(WIN64 TRUE)
+        set(X64 TRUE)
+    else()
+         message(FATAL_ERROR "Unsupported host architecture ${CMAKE_SYSTEM_PROCESSOR}")
+    endif()
+
 else()
-    message(FATAL_ERROR "To continue set golang source for ${CMAKE_SYSTEM_NAME}/${CMAKE_SYSTEM_PROCESSOR} manually")
+    message(FATAL_ERROR "Unsupported host platform ${CMAKE_SYSTEM_NAME}")
 endif()
 
-if(NOT TARGET golang)
-    set(GOROOT "${CMAKE_CURRENT_BINARY_DIR}/golang")
-    externalproject_add(golang
-        URL ${GOSRC}
-        URL_HASH SHA256=${GOSRC_HASH}
+#
+# Download and install golang
+#
+set(GOROOT "${CMAKE_CURRENT_BINARY_DIR}/golang")
+set(GOPATH "${CMAKE_CURRENT_BINARY_DIR}/go-workspace")
+
+if (LINUX64)
+    set(GOSRC       "https://dl.google.com/go/go1.16.10.linux-amd64.tar.gz")
+    set(GOSRC_HASH  "414cd18ce1d193769b9e97d2401ad718755ab47816e13b2a1cde203d263b55cf")
+    set(GOOS        "linux")
+    set(GOARCH      "amd64")
+endif()
+
+if (WIN64)
+    set(GOSRC       "https://dl.google.com/go/go1.16.10.windows-amd64.zip")
+    set(GOSRC_HASH  "787c9afbcd7446874f79bffd20dc4219c3aeff6731bd03f09058bdd546c7eb87")
+    set(GOOS        "windows")
+    set(GOARCH      "amd64")
+endif()
+
+externalproject_add(golang
+    URL ${GOSRC}
+    URL_HASH SHA256=${GOSRC_HASH}
+    CONFIGURE_COMMAND ""
+    BUILD_COMMAND     ""
+    INSTALL_COMMAND   ""
+    SOURCE_DIR        ${GOROOT}
+)
+
+#
+# Install tdm-gcc if on windows. Necessary for CGO compilation step.
+# Visual studio compilers are not supported by Golang/CGO at the moment.
+#
+if (WIN64)
+    set(TDMROOT "${CMAKE_CURRENT_BINARY_DIR}/tdmgcc")
+    make_directory(${TDMROOT})
+
+    externalproject_add(tdmgcca
+        URL https://github.com/jmeubank/tdm-gcc-src/releases/download/v10.3.0-tdm64-1/gcc-10.3.0-tdm64-1-core.zip
+        URL_HASH SHA256=6514c8c2e562d37f3174bad65f0e2498246c60b85a166bf36b124da55a1709fc
         CONFIGURE_COMMAND ""
         BUILD_COMMAND ""
-        INSTALL_COMMAND ""
-        SOURCE_DIR ${GOROOT}
+        INSTALL_COMMAND ${CMAKE_COMMAND} -E copy_directory ${CMAKE_CURRENT_BINARY_DIR}/tdmgcca-src ${TDMROOT}
+        SOURCE_DIR ${CMAKE_CURRENT_BINARY_DIR}/tdmgcca-src
+    )
+
+    externalproject_add(tdmgccb
+        URL https://github.com/jmeubank/tdm-binutils-gdb/releases/download/v2.36.1-tdm64-1/binutils-2.36.1-tdm64-1.zip
+        URL_HASH SHA256=e3e6ca2fd86874c25b5e69e85862b35489c0f381d14bec450274c902642ff22e
+        CONFIGURE_COMMAND ""
+        BUILD_COMMAND ""
+        INSTALL_COMMAND ${CMAKE_COMMAND} -E copy_directory ${CMAKE_CURRENT_BINARY_DIR}/tdmgccb-src ${TDMROOT}
+        SOURCE_DIR ${CMAKE_CURRENT_BINARY_DIR}/tdmgccb-src
+        DEPENDS tdmgcca
+    )
+
+    externalproject_add(tdmgccc
+        URL https://github.com/jmeubank/mingw-w64/releases/download/v8-git2021050601-gcc10-tdm64-1/mingw64runtime-v8-git2021050601-gcc10-tdm64-1.zip
+        URL_HASH SHA256=2f9c7c79f51d968db8659b19dff6778fa504cb482315a2e950922ccb29da6e85
+        CONFIGURE_COMMAND ""
+        BUILD_COMMAND ""
+        INSTALL_COMMAND ${CMAKE_COMMAND} -E copy_directory ${CMAKE_CURRENT_BINARY_DIR}/tdmgccc-src ${TDMROOT}
+        SOURCE_DIR ${CMAKE_CURRENT_BINARY_DIR}/tdmgccc-src
+        DEPENDS tdmgccb
+    )
+
+    externalproject_add(tdmgccd
+        URL https://github.com/jmeubank/tdm-gcc-src/releases/download/v10.3.0-tdm64-1/gcc-10.3.0-tdm64-1-c++.zip
+        URL_HASH SHA256=36d48e2a7697b90bf1375fd16b45f3a802fadab5c677b5dd63357fb1ee25187a
+        CONFIGURE_COMMAND ""
+        BUILD_COMMAND ""
+        INSTALL_COMMAND ${CMAKE_COMMAND} -E copy_directory ${CMAKE_CURRENT_BINARY_DIR}/tdmgccd-src ${TDMROOT}
+        SOURCE_DIR ${CMAKE_CURRENT_BINARY_DIR}/tdmgccd-src
+        DEPENDS tdmgccc
+    )
+
+    externalproject_add(tdmgcce
+        URL https://github.com/jmeubank/windows-default-manifest/releases/download/v6.4-x86_64_multi/windows-default-manifest-6.4-x86_64_multi.zip
+        URL_HASH SHA256=d34b4d149242500cba357ec80fc729dd30f40e120ee022aee7d7af4e9da3a89f
+        CONFIGURE_COMMAND ""
+        BUILD_COMMAND ""
+        INSTALL_COMMAND ${CMAKE_COMMAND} -E copy_directory ${CMAKE_CURRENT_BINARY_DIR}/tdmgcce-src ${TDMROOT}
+        SOURCE_DIR ${CMAKE_CURRENT_BINARY_DIR}/tdmgcce-src
+        DEPENDS tdmgccd
+    )   
+endif()
+
+#
+# Build libipfs-bindings. This is wrapper around go-ipfs
+# that produces a shared [.so + .h]/[.dll + .lib + .h]
+#
+set(BINDINGS_DIR     "${CMAKE_CURRENT_BINARY_DIR}/ipfs_bindings")
+set(BINDINGS_HEADER  "${BINDINGS_DIR}/ipfs_bindings.h")
+set(GOPATH_IPFS_DIR  "${GOPATH}/src/github.com/equalitie/asio-ipfs")
+
+if (LINUX)
+    set(BINDINGS_LIBRARY "${BINDINGS_DIR}/libipfs_bindings.so")
+    set(BINDINGS_OUTPUT  ${BINDINGS_HEADER} ${BINDINGS_LIBRARY})
+    set(BINDINGS_DLL     "${BINDINGS_DIR}/libipfs_bindings.so")
+
+    add_custom_command(
+        OUTPUT  ${BINDINGS_OUTPUT}
+
+        DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/include/asio_ipfs/ipfs_error_codes.h
+                ${CMAKE_CURRENT_SOURCE_DIR}/src/ipfs_bindings/ipfs_bindings.go
+                golang
+        
+        COMMAND export PATH=:$ENV{PATH}
+             && export GOROOT=${GOROOT}
+             && export GOPATH=${GOPATH}
+             && export GOOS=${GOOS}
+             && export GOARCH=${GOARCH}
+             && export GOARM=${GOARM}
+             && export CGO_ENABLED=1
+             && export CC=${CMAKE_C_COMPILER}
+             && export GO111MODULE=on
+             && ${CMAKE_COMMAND} -E make_directory ${BINDINGS_DIR}
+             && ${CMAKE_COMMAND} -E make_directory ${GOPATH_IPFS_DIR}
+             && ${CMAKE_COMMAND} -E copy_directory ${CMAKE_CURRENT_SOURCE_DIR}/include ${GOPATH_IPFS_DIR}/include
+             && ${CMAKE_COMMAND} -E copy_directory ${CMAKE_CURRENT_SOURCE_DIR}/src ${GOPATH_IPFS_DIR}/src
+             && ${CMAKE_COMMAND} -E copy ${CMAKE_CURRENT_SOURCE_DIR}/go.mod ${GOPATH_IPFS_DIR}
+             && ${CMAKE_COMMAND} -E copy ${CMAKE_CURRENT_SOURCE_DIR}/go.sum ${GOPATH_IPFS_DIR}
+             && cd ${GOPATH_IPFS_DIR}
+             && go build --buildmode=c-shared
+                         -o ${BINDINGS_DIR}/libipfs_bindings.so
+                         -modcacherw
+                         ./src/ipfs_bindings             
+    )
+elseif(WIN64)
+    set(BINDINGS_LIBRARY "${BINDINGS_DIR}/ipfs_bindings.lib")
+    set(BINDINGS_DLL     "${BINDINGS_DIR}/ipfs_bindings.dll")
+    set(BINDINGS_DEF     "${BINDINGS_DIR}/ipfs_bindings.def")
+    set(BINDINGS_OUTPUT  ${BINDINGS_HEADER} ${BINDINGS_DLL} ${BINDINGS_LIBRARY})
+
+    add_custom_command(
+        OUTPUT ${BINDINGS_OUTPUT}       
+        DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/include/asio_ipfs/ipfs_error_codes.h
+                ${CMAKE_CURRENT_SOURCE_DIR}/src/ipfs_bindings/ipfs_bindings.go
+                golang tdmgcce 
+        COMMAND ${CMAKE_COMMAND} -E make_directory ${BINDINGS_DIR}        
+             && ${CMAKE_COMMAND} -E make_directory ${GOPATH_IPFS_DIR}
+             && ${CMAKE_COMMAND} -E copy_directory ${CMAKE_CURRENT_SOURCE_DIR}/include ${GOPATH_IPFS_DIR}/include
+             && ${CMAKE_COMMAND} -E copy_directory ${CMAKE_CURRENT_SOURCE_DIR}/src ${GOPATH_IPFS_DIR}/src
+             && ${CMAKE_COMMAND} -E copy ${CMAKE_CURRENT_SOURCE_DIR}/go.mod ${GOPATH_IPFS_DIR}
+             && ${CMAKE_COMMAND} -E copy ${CMAKE_CURRENT_SOURCE_DIR}/go.sum ${GOPATH_IPFS_DIR}
+        COMMAND cd ${GOPATH_IPFS_DIR}       
+             && ${CMAKE_COMMAND} -E env 
+                "GOROOT=${GOROOT}" 
+                "GOPATH=${GOPATH}"
+                "GOOS=${GOOS}"
+                "GOARCH=${GOARCH}"
+                "CGO_ENABLED=1"
+                "CC=${TDMROOT}/bin/gcc.exe"
+                "GO111MODULE=on"
+                "GOTESTMSVC=1"
+                "GOGCCFLAGS=-m64 -mthreads -fno-caret-diagnostics -Qunused-arguments -fmessage-length=0 -gno-record-gcc-switches"
+                ${GOROOT}/bin/go build
+                    --buildmode=c-shared
+                    -o ${BINDINGS_DIR}/ipfs_bindings.dll
+                    -modcacherw
+                    ./src/ipfs_bindings        
+        COMMAND cd ${BINDINGS_DIR}
+             && ${TDMROOT}/x86_64-w64-mingw32/bin/gendef.exe ipfs_bindings.dll
+             && lib /def:${BINDINGS_DEF} /machine:x64 
     )
 endif()
 
-# Convert system name into GOOS.
-if("${CMAKE_SYSTEM_NAME}" STREQUAL "Linux")
-    set(GOOS "linux")
-elseif("${CMAKE_SYSTEM_NAME}" STREQUAL "Windows")
-    set(GOOS "windows")
-elseif("${CMAKE_SYSTEM_NAME}" STREQUAL "Android")
-    set(GOOS "android")
-else()
-    message(FATAL_ERROR "unknown system name ${CMAKE_SYSTEM_NAME}")
-endif()
-
-# Convert system processor into GOARCH (and maybe GOARM).
-if("${CMAKE_SYSTEM_PROCESSOR}" STREQUAL "x86_64")
-    set(GOARCH "amd64")
-elseif("${CMAKE_SYSTEM_PROCESSOR}" STREQUAL "AMD64")
-    set(GOARCH "amd64")
-elseif("${CMAKE_SYSTEM_PROCESSOR}" STREQUAL "i686")
-    set(GOARCH "386")
-elseif("${CMAKE_SYSTEM_PROCESSOR}" STREQUAL "aarch64")
-    set(GOARCH "arm64")
-elseif("${CMAKE_SYSTEM_PROCESSOR}" STREQUAL "armv7-a")
-    set(GOARCH "arm")
-    set(GOARM "7")
-elseif("${CMAKE_SYSTEM_PROCESSOR}" MATCHES "^arm.*")
-    set(GOARCH "arm")
-    set(GOARM "5")
-else()
-    message(FATAL_ERROR "unknown system processor ${CMAKE_SYSTEM_PROCESSOR}")
-endif()
-
-################################################################################
-
-set(GOPATH "${CMAKE_CURRENT_BINARY_DIR}/go-workspace")
-
-# TODO: Temporarily disabled version that takes go-ipfs from
-#       official releases due to RC1 candidates not being there.
-#externalproject_add(go-ipfs
-#    URL https://dist.ipfs.io/go-ipfs/v0.4.19/go-ipfs-source.tar.gz
-#    URL_HASH SHA512=89d32fc560683b5bd4f67ae22859d57865ec364e28f065e81bd2618412dccbcc9c5a395f5f297b3ce4c9f6112560ea209e4b2a794c9b0d759b2980569b7ccf82
-#    CONFIGURE_COMMAND ""
-#    BUILD_COMMAND mkdir -p ${GOPATH}/src/github.com/ipfs
-#               && rsync -r ${CMAKE_CURRENT_BINARY_DIR}/go-ipfs-prefix/src/go-ipfs ${GOPATH}/src/github.com/ipfs --exclude=vendor/gx
-#               && rsync -r ${CMAKE_CURRENT_BINARY_DIR}/go-ipfs-prefix/src/go-ipfs/vendor/gx ${GOPATH}/src
-#    INSTALL_COMMAND ""
-#)
-
-set(BINDINGS_DIR "${CMAKE_CURRENT_BINARY_DIR}/ipfs_bindings")
-set(BINDINGS_HEADER  "${BINDINGS_DIR}/ipfs_bindings.h")
-set(BINDINGS_LIBRARY "${BINDINGS_DIR}/libipfs_bindings.so")
-set(BINDINGS_OUTPUT ${BINDINGS_HEADER} ${BINDINGS_LIBRARY})
-
-add_custom_command(
-    OUTPUT ${BINDINGS_OUTPUT}
-    DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/include/asio_ipfs/ipfs_error_codes.h
-            ${CMAKE_CURRENT_SOURCE_DIR}/src/ipfs_bindings/ipfs_bindings.go
-            golang
-    COMMAND mkdir -p ${BINDINGS_DIR}
-         && export PATH=${GOROOT}/bin:$ENV{PATH}
-         && export GOROOT=${GOROOT}
-         && export GOPATH=${GOPATH}
-         && export GOOS=${GOOS}
-         && export GOARCH=${GOARCH}
-         && export GOARM=${GOARM}
-         && export CGO_ENABLED=1
-         && export CC=${CMAKE_C_COMPILER}
-         && export GO111MODULE=on
-         && export GOPROXY='https://proxy.golang.org' # https://github.com/ipfs/go-ipfs/issues/6460#issuecomment-504937222
-         && mkdir -p ${GOPATH}/src/github.com/equalitie/asio-ipfs
-         && cd ${GOPATH}/src/github.com/equalitie/asio-ipfs
-         && rsync -r ${CMAKE_CURRENT_SOURCE_DIR}/include ${CMAKE_CURRENT_SOURCE_DIR}/src .
-         && cp ${CMAKE_CURRENT_SOURCE_DIR}/go.mod ./
-         && cp ${CMAKE_CURRENT_SOURCE_DIR}/go.sum ./
-         && go build -ldflags '-extldflags -Wl,-soname,libipfs_bindings.so'
-                     --buildmode=c-shared
-                     -o ${BINDINGS_DIR}/ipfs_bindings.so
-                     ./src/ipfs_bindings
-         && chmod u+w -R ${GOPATH} # Modules cache is ro by default which CI doesn't cope with; https://github.com/golang/go/issues/27161
-         && mv ${BINDINGS_DIR}/ipfs_bindings.so ${BINDINGS_DIR}/libipfs_bindings.so
+add_custom_target(ipfs-bindings-build ALL
+    DEPENDS ${BINDINGS_OUTPUT}
 )
-add_custom_target(ipfs-bindings DEPENDS ${BINDINGS_OUTPUT})
 
-################################################################################
+if (BEAM_SIGN_PACKAGE AND WIN32)
+    add_custom_command(
+        TARGET ipfs-bindings-build POST_BUILD
+        COMMAND ${SIGNTOOL_EXECUTABLE} sign ${SIGNTOOL_OPTIONS} ${BINDINGS_DLL}
+    )
+endif()
+
+add_library(ipfs-bindings SHARED IMPORTED GLOBAL
+    DEPENDS ipfs-bindings-build 
+)
+
+set_property(TARGET ipfs-bindings PROPERTY
+    IMPORTED_LOCATION ${BINDINGS_DLL}
+    IMPORTED_IMPLIB ${BINDINGS_LIBRARY}
+)
+
+#
+# asio-ipfs itself
+#
 file(GLOB sources "./src/*.cpp")
-add_library(asio-ipfs STATIC ${sources})
-set_target_properties(asio-ipfs PROPERTIES LINKER_LANGUAGE CXX)
-add_dependencies(asio-ipfs ipfs-bindings)
+
+add_library(asio-ipfs 
+    STATIC ${sources}
+)
+
+set_target_properties(asio-ipfs
+    PROPERTIES LINKER_LANGUAGE CXX
+                IPFS_DLL ${BINDINGS_DLL}
+)
+
+add_dependencies(asio-ipfs 
+    ipfs-bindings
+    ipfs-bindings-build
+)
+
 target_include_directories(asio-ipfs
     PRIVATE ${BINDINGS_DIR}
     PUBLIC "include"
 )
-target_compile_definitions(asio-ipfs
-    PUBLIC
-        # This is a static library, so don't include asio. Users need to link
-        # libboost_asio either statically or as a shared library.
-        -DBOOST_ASIO_SEPARATE_COMPILATION
-        # For some reason we need to define both of these
-        -DBOOST_COROUTINES_NO_DEPRECATION_WARNING
-        -DBOOST_COROUTINE_NO_DEPRECATION_WARNING
-)
-target_compile_options(asio-ipfs
-    PUBLIC -std=c++14
-)
+
 target_link_libraries(asio-ipfs
-    PRIVATE ${BINDINGS_LIBRARY}
+    PUBLIC ${BINDINGS_LIBRARY}
     PUBLIC Boost::boost
     INTERFACE ${Boost_LIBRARIES}
 )
-
-# The static library asio-ipfs requires a separately compiled asio,
-# so supply one for the tests and examples.
-add_library(asio-ipfs_static_asio STATIC "lib/asio.cpp")
-target_link_libraries(asio-ipfs_static_asio
-        PUBLIC
-        Boost::boost
-        INTERFACE
-        ${Boost_LIBRARIES}
-        Threads::Threads
-        )
-target_compile_definitions(asio-ipfs_static_asio
-        PUBLIC -DBOOST_ASIO_SEPARATE_COMPILATION
-        )
-
-################################################################################
-if(ASIO_IPFS_WITH_EXAMPLE_BINARIES)
-################################################################################
-    find_package(Boost ${BOOST_VERSION} REQUIRED COMPONENTS
-        program_options
-    )
-
-    add_executable(ipfs-example "example/ipfs.cpp")
-    target_link_libraries(ipfs-example
-        asio-ipfs
-        asio-ipfs_static_asio
-    )
-endif() # ASIO_IPFS_WITH_EXAMPLE_BINARIES
