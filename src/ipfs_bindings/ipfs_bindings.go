@@ -451,7 +451,7 @@ func go_asio_memfree(what unsafe.Pointer) {
 	C.free(what)
 }
 
-// IMPORTANT: The returned value needs to be explicitly `free`d.
+// IMPORTANT: The returned value needs to be explicitly go_asio_memfree-d
 //export go_asio_ipfs_node_id
 func go_asio_ipfs_node_id(handle uint64) *C.char {
     //TODO:IPFS
@@ -470,7 +470,6 @@ func go_asio_ipfs_node_id(handle uint64) *C.char {
 
 	cstr := C.CString(pid.Pretty())
 	return cstr*/
-	// TODO:IPFS C.CString - will not work on windows (GCC/MSVB free conflict)
 	cstr := C.CString("TODO")
 	return cstr
 }
