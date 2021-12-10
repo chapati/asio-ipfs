@@ -143,9 +143,9 @@ set(BINDINGS_HEADER  "${BINDINGS_DIR}/ipfs_bindings.h")
 set(GOPATH_IPFS_DIR  "${GOPATH}/src/github.com/equalitie/asio-ipfs")
 
 if (LINUX)
-    set(BINDINGS_LIBRARY "${BINDINGS_DIR}/libipfs_bindings.so")
+    set(BINDINGS_LIBRARY "${BINDINGS_DIR}/libipfs-bindings.so")
     set(BINDINGS_OUTPUT  ${BINDINGS_HEADER} ${BINDINGS_LIBRARY})
-    set(BINDINGS_DLL     "${BINDINGS_DIR}/libipfs_bindings.so")
+    set(BINDINGS_DLL     "${BINDINGS_DIR}/libipfs-bindings.so")
 
     add_custom_command(
         OUTPUT  ${BINDINGS_OUTPUT}
@@ -171,14 +171,14 @@ if (LINUX)
              && ${CMAKE_COMMAND} -E copy ${CMAKE_CURRENT_SOURCE_DIR}/go.sum ${GOPATH_IPFS_DIR}
              && cd ${GOPATH_IPFS_DIR}
              && go build --buildmode=c-shared
-                         -o ${BINDINGS_DIR}/libipfs_bindings.so
+                         -o ${BINDINGS_DIR}/libipfs-bindings.so
                          -modcacherw
                          ./src/ipfs_bindings             
     )
 elseif(WIN64)
-    set(BINDINGS_LIBRARY "${BINDINGS_DIR}/ipfs_bindings.lib")
-    set(BINDINGS_DLL     "${BINDINGS_DIR}/ipfs_bindings.dll")
-    set(BINDINGS_DEF     "${BINDINGS_DIR}/ipfs_bindings.def")
+    set(BINDINGS_LIBRARY "${BINDINGS_DIR}/ipfs-bindings.lib")
+    set(BINDINGS_DLL     "${BINDINGS_DIR}/ipfs-bindings.dll")
+    set(BINDINGS_DEF     "${BINDINGS_DIR}/ipfs-bindings.def")
     set(BINDINGS_OUTPUT  ${BINDINGS_HEADER} ${BINDINGS_DLL} ${BINDINGS_LIBRARY})
 
     add_custom_command(
@@ -205,11 +205,11 @@ elseif(WIN64)
                 "GOGCCFLAGS=-m64 -mthreads -fno-caret-diagnostics -Qunused-arguments -fmessage-length=0 -gno-record-gcc-switches"
                 ${GOROOT}/bin/go build
                     --buildmode=c-shared
-                    -o ${BINDINGS_DIR}/ipfs_bindings.dll
+                    -o ${BINDINGS_DIR}/ipfs-bindings.dll
                     -modcacherw
-                    ./src/ipfs_bindings        
+                    ./src/ipfs_bindings
         COMMAND cd ${BINDINGS_DIR}
-             && ${TDMROOT}/x86_64-w64-mingw32/bin/gendef.exe ipfs_bindings.dll
+             && ${TDMROOT}/x86_64-w64-mingw32/bin/gendef.exe ipfs-bindings.dll
              && lib /def:${BINDINGS_DEF} /machine:x64 
     )
 endif()
