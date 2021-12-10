@@ -1,3 +1,8 @@
+#ifdef WIN32
+typedef size_t __SIZE_TYPE__;
+#define _Complex 
+#endif
+
 #include <ipfs_bindings.h>
 #include <asio_ipfs/error.h>
 #include <cassert>
@@ -67,7 +72,7 @@ struct Handle : public HandleBase {
             // gets unlinked. But we just set the `cancel_fn` to do nothing
             // above, so the destructor ends up in an infinite loop.
             unlink();
-            std::experimental::apply(cb_, make_tuple(ec, std::move(args)...));
+            std::apply(cb_, make_tuple(ec, std::move(args)...));
         };
 
         *cancel_fn = [this] {
@@ -80,14 +85,15 @@ struct Handle : public HandleBase {
             assert(job_count);
             ++job_count;
 
-            ios.post([this, callback = std::move(cb)] {
+            auto postcb = [this, callback = std::move(cb)](){
                 auto on_exit = defer([&] { if (!--job_count) delete(this); });
 
                 tuple<sys::error_code, As...> args;
                 std::get<0>(args) = asio::error::operation_aborted;
-                std::experimental::apply(callback, std::move(args));
-            });
+                std::apply(callback, std::move(args));
+            };
 
+            this->ios.post(postcb);
             (*cancel_fn) = []{};
         };
 
@@ -109,7 +115,7 @@ struct Handle : public HandleBase {
             auto on_exit = defer([&] { if (!--self->job_count) delete(self); });
 
             if (self->cb) {
-                std::experimental::apply(self->cb, tuple<sys::error_code, As...>(std::move(full_args)));
+                std::apply(self->cb, tuple<sys::error_code, As...>(std::move(full_args)));
             }
         });
     }
@@ -254,7 +260,7 @@ node& node::operator=(node&&) = default;
 string node::id() const {
     char* cid = go_asio_ipfs_node_id(_impl->ipfs_handle);
     string ret(cid);
-    free(cid);
+    go_asio_memfree(cid);
     return ret;
 }
 

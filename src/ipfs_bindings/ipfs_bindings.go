@@ -446,6 +446,10 @@ func go_asio_ipfs_start_async(handle uint64, c_cfg *C.char, c_repoPath *C.char, 
 	}()
 }
 
+//export go_asio_memfree
+func go_asio_memfree(what unsafe.Pointer) {
+	C.free(what)
+}
 
 // IMPORTANT: The returned value needs to be explicitly `free`d.
 //export go_asio_ipfs_node_id
@@ -466,6 +470,7 @@ func go_asio_ipfs_node_id(handle uint64) *C.char {
 
 	cstr := C.CString(pid.Pretty())
 	return cstr*/
+	// TODO:IPFS C.CString - will not work on windows (GCC/MSVB free conflict)
 	cstr := C.CString("TODO")
 	return cstr
 }
