@@ -237,8 +237,19 @@ add_library(ipfs-bindings SHARED IMPORTED GLOBAL
 
 set_property(TARGET ipfs-bindings PROPERTY
     IMPORTED_LOCATION ${BINDINGS_DLL}
-    IMPORTED_IMPLIB ${BINDINGS_LIBRARY}
 )
+
+if (WIN32)
+    set_property(TARGET ipfs-bindings PROPERTY
+        IMPORTED_IMPLIB ${BINDINGS_LIBRARY}
+    )
+endif()
+
+if (LINUX)
+    set_property(TARGET ipfs-bindings PROPERTY
+        IMPORTED_SONAME ${SONAME}
+    )
+endif()
 
 #
 # asio-ipfs itself
@@ -251,7 +262,7 @@ add_library(asio-ipfs
 
 set_target_properties(asio-ipfs
     PROPERTIES LINKER_LANGUAGE CXX
-                IPFS_DLL ${BINDINGS_DLL}
+               IPFS_DLL ${BINDINGS_DLL}
 )
 
 add_dependencies(asio-ipfs 
@@ -265,7 +276,7 @@ target_include_directories(asio-ipfs
 )
 
 target_link_libraries(asio-ipfs
-    PUBLIC ${BINDINGS_LIBRARY}
+    PUBLIC ipfs-bindings
     PUBLIC Boost::boost
     INTERFACE ${Boost_LIBRARIES}
 )
