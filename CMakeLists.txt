@@ -139,7 +139,7 @@ endif()
 # that produces a shared [.so + .h]/[.dll + .lib + .h]
 #
 set(BINDINGS_DIR     "${CMAKE_CURRENT_BINARY_DIR}/ipfs_bindings")
-set(BINDINGS_HEADER  "${BINDINGS_DIR}/ipfs_bindings.h")
+set(BINDINGS_HEADER  "${BINDINGS_DIR}/ipfs-bindings.h")
 set(GOPATH_IPFS_DIR  "${GOPATH}/src/github.com/equalitie/asio-ipfs")
 
 if (LINUX)

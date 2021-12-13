@@ -3,7 +3,7 @@ typedef size_t __SIZE_TYPE__;
 #define _Complex 
 #endif
 
-#include <ipfs_bindings.h>
+#include <ipfs-bindings.h>
 #include <asio_ipfs/error.h>
 #include <cassert>
 #include <tuple>
