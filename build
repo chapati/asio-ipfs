@@ -6,4 +6,4 @@ export GO111MODULE=on
 export GOPROXY='https://proxy.golang.org' # https://github.com/ipfs/go-ipfs/issues/6460#issuecomment-504937222
 go version
 go mod tidy
-go build -v -ldflags '-extldflags -Wl,-soname,libipfs_bindings.so' --buildmode=c-shared -o ipfs_bindings.so ./src/ipfs_bindings
+go build -v -ldflags '-extldflags -Wl,-soname,libipfs-bindings.so' --buildmode=c-shared -o ipfs-bindings.so ./src/ipfs_bindings
