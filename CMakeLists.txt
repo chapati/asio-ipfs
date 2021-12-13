@@ -142,8 +142,9 @@ set(BINDINGS_HEADER  "${BINDINGS_DIR}/ipfs-bindings.h")
 set(GOPATH_IPFS_DIR  "${GOPATH}/src/github.com/equalitie/asio-ipfs")
 
 if (LINUX)
-    set(BINDINGS_LIBRARY "${BINDINGS_DIR}/libipfs-bindings.so")
-    set(BINDINGS_DLL     "${BINDINGS_DIR}/libipfs-bindings.so")
+    set(SONAME           "libipfs-bindings.so")
+    set(BINDINGS_LIBRARY "${BINDINGS_DIR}/${SONAME}")
+    set(BINDINGS_DLL     "${BINDINGS_DIR}/${SONAME}")
     set(BINDINGS_OUTPUT  ${BINDINGS_HEADER} ${BINDINGS_LIBRARY})
 
     add_custom_command(
@@ -172,7 +173,8 @@ if (LINUX)
              && export GOGCCFLAGS="-m64 -mthreads -fno-caret-diagnostics -Qunused-arguments -fmessage-length=0 -gno-record-gcc-switches"
              && ${GOROOT}/bin/go build
                     --buildmode=c-shared
-                    -ldflags "-s -w"
+                    -ldflags '-extldflags -Wl,-soname,${SONAME}'
+                    -ldflags '-s -w'
                     -modcacherw
                     -o ${BINDINGS_LIBRARY}
                     ./src/ipfs_bindings
