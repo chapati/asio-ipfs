@@ -1,9 +1,11 @@
 #ifdef WIN32
 typedef size_t __SIZE_TYPE__;
-#define _Complex 
+#define _Complex
+#include <ipfs-bindings.h>
+#else
+#include <libipfs-bindings.h>
 #endif
 
-#include <ipfs-bindings.h>
 #include <asio_ipfs/error.h>
 #include <cassert>
 #include <tuple>

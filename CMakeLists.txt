@@ -143,8 +143,8 @@ set(GOPATH_IPFS_DIR  "${GOPATH}/src/github.com/equalitie/asio-ipfs")
 
 if (LINUX)
     set(BINDINGS_LIBRARY "${BINDINGS_DIR}/libipfs-bindings.so")
-    set(BINDINGS_OUTPUT  ${BINDINGS_HEADER} ${BINDINGS_LIBRARY})
     set(BINDINGS_DLL     "${BINDINGS_DIR}/libipfs-bindings.so")
+    set(BINDINGS_OUTPUT  ${BINDINGS_HEADER} ${BINDINGS_LIBRARY})
 
     add_custom_command(
         OUTPUT  ${BINDINGS_OUTPUT}
@@ -152,8 +152,15 @@ if (LINUX)
         DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/include/asio_ipfs/ipfs_error_codes.h
                 ${CMAKE_CURRENT_SOURCE_DIR}/src/ipfs_bindings/ipfs_bindings.go
                 golang
-        
-        COMMAND export PATH=:$ENV{PATH}
+
+        COMMAND ${CMAKE_COMMAND} -E make_directory ${BINDINGS_DIR}
+            && ${CMAKE_COMMAND} -E make_directory ${GOPATH_IPFS_DIR}
+            && ${CMAKE_COMMAND} -E copy_directory ${CMAKE_CURRENT_SOURCE_DIR}/include ${GOPATH_IPFS_DIR}/include
+            && ${CMAKE_COMMAND} -E copy_directory ${CMAKE_CURRENT_SOURCE_DIR}/src ${GOPATH_IPFS_DIR}/src
+            && ${CMAKE_COMMAND} -E copy ${CMAKE_CURRENT_SOURCE_DIR}/go.mod ${GOPATH_IPFS_DIR}
+            && ${CMAKE_COMMAND} -E copy ${CMAKE_CURRENT_SOURCE_DIR}/go.sum ${GOPATH_IPFS_DIR}
+
+        COMMAND cd ${GOPATH_IPFS_DIR}
              && export GOROOT=${GOROOT}
              && export GOPATH=${GOPATH}
              && export GOOS=${GOOS}
@@ -162,18 +169,13 @@ if (LINUX)
              && export CGO_ENABLED=1
              && export CC=${CMAKE_C_COMPILER}
              && export GO111MODULE=on
-             && ${CMAKE_COMMAND} -E make_directory ${BINDINGS_DIR}
-             && ${CMAKE_COMMAND} -E make_directory ${GOPATH_IPFS_DIR}
-             && ${CMAKE_COMMAND} -E copy_directory ${CMAKE_CURRENT_SOURCE_DIR}/include ${GOPATH_IPFS_DIR}/include
-             && ${CMAKE_COMMAND} -E copy_directory ${CMAKE_CURRENT_SOURCE_DIR}/src ${GOPATH_IPFS_DIR}/src
-             && ${CMAKE_COMMAND} -E copy ${CMAKE_CURRENT_SOURCE_DIR}/go.mod ${GOPATH_IPFS_DIR}
-             && ${CMAKE_COMMAND} -E copy ${CMAKE_CURRENT_SOURCE_DIR}/go.sum ${GOPATH_IPFS_DIR}
-             && cd ${GOPATH_IPFS_DIR}
-             && go build --buildmode=c-shared
-                         -o ${BINDINGS_DIR}/libipfs-bindings.so
-                         -ldflags "-s -w"
-                         -modcacherw
-                         ./src/ipfs_bindings             
+             && export GOGCCFLAGS="-m64 -mthreads -fno-caret-diagnostics -Qunused-arguments -fmessage-length=0 -gno-record-gcc-switches"
+             && ${GOROOT}/bin/go build
+                    --buildmode=c-shared
+                    -ldflags "-s -w"
+                    -modcacherw
+                    -o ${BINDINGS_LIBRARY}
+                    ./src/ipfs_bindings
     )
 elseif(WIN64)
     set(BINDINGS_LIBRARY "${BINDINGS_DIR}/ipfs-bindings.lib")
@@ -185,13 +187,15 @@ elseif(WIN64)
         OUTPUT ${BINDINGS_OUTPUT}       
         DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/include/asio_ipfs/ipfs_error_codes.h
                 ${CMAKE_CURRENT_SOURCE_DIR}/src/ipfs_bindings/ipfs_bindings.go
-                golang tdmgcce 
+                golang tdmgcce
+
         COMMAND ${CMAKE_COMMAND} -E make_directory ${BINDINGS_DIR}        
              && ${CMAKE_COMMAND} -E make_directory ${GOPATH_IPFS_DIR}
              && ${CMAKE_COMMAND} -E copy_directory ${CMAKE_CURRENT_SOURCE_DIR}/include ${GOPATH_IPFS_DIR}/include
              && ${CMAKE_COMMAND} -E copy_directory ${CMAKE_CURRENT_SOURCE_DIR}/src ${GOPATH_IPFS_DIR}/src
              && ${CMAKE_COMMAND} -E copy ${CMAKE_CURRENT_SOURCE_DIR}/go.mod ${GOPATH_IPFS_DIR}
              && ${CMAKE_COMMAND} -E copy ${CMAKE_CURRENT_SOURCE_DIR}/go.sum ${GOPATH_IPFS_DIR}
+
         COMMAND cd ${GOPATH_IPFS_DIR}       
              && ${CMAKE_COMMAND} -E env 
                 "GOROOT=${GOROOT}" 
@@ -206,7 +210,7 @@ elseif(WIN64)
                 ${GOROOT}/bin/go build
                     --buildmode=c-shared
                     -ldflags "-s -w"
-                    -o ${BINDINGS_DIR}/ipfs-bindings.dll
+                    -o ${BINDINGS_LIBRARY}
                     -modcacherw
                     ./src/ipfs_bindings
         COMMAND cd ${BINDINGS_DIR}
