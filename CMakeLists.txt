@@ -173,8 +173,7 @@ if (LINUX)
              && export GOGCCFLAGS="-m64 -mthreads -fno-caret-diagnostics -Qunused-arguments -fmessage-length=0 -gno-record-gcc-switches"
              && ${GOROOT}/bin/go build
                     --buildmode=c-shared
-                    -ldflags '-extldflags -Wl,-soname,${SONAME}'
-                    -ldflags '-s -w'
+                    -ldflags '-s -w -extldflags=-Wl,-soname,${SONAME}.so'
                     -modcacherw
                     -o ${BINDINGS_DLL}
                     ./src/ipfs_bindings
