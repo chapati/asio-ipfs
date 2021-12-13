@@ -3,7 +3,6 @@
 # TODO:IPFS MacOS
 # TODO:IPFS Android ?
 # TODO:IPFS WebAssembly (switch off)
-# TODO:IPFS Arm?
 cmake_minimum_required (VERSION 3.13)
 
 project(asio-ipfs)
@@ -172,6 +171,7 @@ if (LINUX)
              && cd ${GOPATH_IPFS_DIR}
              && go build --buildmode=c-shared
                          -o ${BINDINGS_DIR}/libipfs-bindings.so
+                         -ldflags "-s -w"
                          -modcacherw
                          ./src/ipfs_bindings             
     )
@@ -205,6 +205,7 @@ elseif(WIN64)
                 "GOGCCFLAGS=-m64 -mthreads -fno-caret-diagnostics -Qunused-arguments -fmessage-length=0 -gno-record-gcc-switches"
                 ${GOROOT}/bin/go build
                     --buildmode=c-shared
+                    -ldflags "-s -w"
                     -o ${BINDINGS_DIR}/ipfs-bindings.dll
                     -modcacherw
                     ./src/ipfs_bindings
