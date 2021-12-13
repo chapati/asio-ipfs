@@ -176,7 +176,7 @@ if (LINUX)
                     -ldflags '-extldflags -Wl,-soname,${SONAME}'
                     -ldflags '-s -w'
                     -modcacherw
-                    -o ${BINDINGS_LIBRARY}
+                    -o ${BINDINGS_DLL}
                     ./src/ipfs_bindings
     )
 elseif(WIN64)
@@ -212,7 +212,7 @@ elseif(WIN64)
                 ${GOROOT}/bin/go build
                     --buildmode=c-shared
                     -ldflags "-s -w"
-                    -o ${BINDINGS_LIBRARY}
+                    -o ${BINDINGS_DLL}
                     -modcacherw
                     ./src/ipfs_bindings
         COMMAND cd ${BINDINGS_DIR}
