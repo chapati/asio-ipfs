@@ -33,7 +33,7 @@ if ("${CMAKE_SYSTEM_NAME}" STREQUAL "Linux")
     endif()
 
 elseif("${CMAKE_SYSTEM_NAME}" STREQUAL "Windows")
-    set(WIN TRUE)
+    set(WINDOWS TRUE)
     
     if ("${CMAKE_SYSTEM_PROCESSOR}" STREQUAL "AMD64")
         set(WIN64 TRUE)
@@ -79,7 +79,7 @@ externalproject_add(golang
 # Install tdm-gcc if on windows. Necessary for CGO compilation step.
 # Visual studio compilers are not supported by Golang/CGO at the moment.
 #
-if (WIN64)
+if (WINDOWS)
     set(TDMROOT "${CMAKE_CURRENT_BINARY_DIR}/tdmgcc")
     make_directory(${TDMROOT})
 
@@ -134,22 +134,25 @@ if (WIN64)
 endif()
 
 #
-# Build libipfs-bindings. This is wrapper around go-ipfs
-# that produces a shared [.so + .h]/[.dll + .lib + .h]
+# Build libipfs-bindings. This is a wrapper around go-ipfs
+# that produces a shared library [.dll + .lib + .h] on Windows
+# and a static library [.a + .h] on other operating systems.
+#
+# Since CGO uses GCC and Beam itself uses MSVC the only way
+# on Windows is to use a DLL. On other operating systems the
+# story is much easier and we can use usual lib/.a and not
+# overcomplicate our build & install process
 #
 set(BINDINGS_DIR     "${CMAKE_CURRENT_BINARY_DIR}/ipfs_bindings")
 set(BINDINGS_HEADER  "${BINDINGS_DIR}/ipfs-bindings.h")
 set(GOPATH_IPFS_DIR  "${GOPATH}/src/github.com/equalitie/asio-ipfs")
 
 if (LINUX)
-    set(SONAME           "libipfs-bindings.so")
-    set(BINDINGS_LIBRARY "${BINDINGS_DIR}/${SONAME}")
-    set(BINDINGS_DLL     "${BINDINGS_DIR}/${SONAME}")
+    set(BINDINGS_LIBRARY "${BINDINGS_DIR}/libipfs-bindings.a")
     set(BINDINGS_OUTPUT  ${BINDINGS_HEADER} ${BINDINGS_LIBRARY})
 
     add_custom_command(
         OUTPUT  ${BINDINGS_OUTPUT}
-
         DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/include/asio_ipfs/ipfs_error_codes.h
                 ${CMAKE_CURRENT_SOURCE_DIR}/src/ipfs_bindings/ipfs_bindings.go
                 golang
@@ -172,10 +175,10 @@ if (LINUX)
              && export GO111MODULE=on
              && export GOGCCFLAGS="-m64 -mthreads -fno-caret-diagnostics -Qunused-arguments -fmessage-length=0 -gno-record-gcc-switches"
              && ${GOROOT}/bin/go build
-                    --buildmode=c-shared
-                    -ldflags '-s -w -extldflags=-Wl,-soname,${SONAME}'
+                    --buildmode=c-archive
+                    -ldflags "-s -w"
                     -modcacherw
-                    -o ${BINDINGS_DLL}
+                    -o ${BINDINGS_LIBRARY}
                     ./src/ipfs_bindings
     )
 elseif(WIN64)
@@ -231,23 +234,24 @@ if (BEAM_SIGN_PACKAGE AND WIN32)
     )
 endif()
 
-add_library(ipfs-bindings SHARED IMPORTED GLOBAL
-    DEPENDS ipfs-bindings-build 
-)
+if (WINDOWS)
+    add_library(ipfs-bindings SHARED IMPORTED GLOBAL
+        DEPENDS ipfs-bindings-build
+    )
 
-set_property(TARGET ipfs-bindings PROPERTY
-    IMPORTED_LOCATION ${BINDINGS_DLL}
-)
-
-if (WIN32)
     set_property(TARGET ipfs-bindings PROPERTY
+        IMPORTED_LOCATION ${BINDINGS_DLL}
         IMPORTED_IMPLIB ${BINDINGS_LIBRARY}
     )
 endif()
 
 if (LINUX)
+    add_library(ipfs-bindings STATIC IMPORTED GLOBAL
+        DEPENDS ipfs-bindings-build
+    )
+
     set_property(TARGET ipfs-bindings PROPERTY
-        IMPORTED_SONAME ${SONAME}
+        IMPORTED_LOCATION ${BINDINGS_LIBRARY}
     )
 endif()
 
@@ -262,8 +266,13 @@ add_library(asio-ipfs
 
 set_target_properties(asio-ipfs
     PROPERTIES LINKER_LANGUAGE CXX
-               IPFS_DLL ${BINDINGS_DLL}
 )
+
+if (WINDOWS)
+    set_target_properties(asio-ipfs
+        IPFS_DLL ${BINDINGS_DLL}
+    )
+endif()
 
 add_dependencies(asio-ipfs 
     ipfs-bindings
