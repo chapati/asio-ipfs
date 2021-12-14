@@ -270,7 +270,7 @@ set_target_properties(asio-ipfs
 
 if (WINDOWS)
     set_target_properties(asio-ipfs
-        IPFS_DLL ${BINDINGS_DLL}
+        PROPERTIES IPFS_DLL ${BINDINGS_DLL}
     )
 endif()
 
