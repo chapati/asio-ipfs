@@ -144,10 +144,10 @@ endif()
 # overcomplicate our build & install process
 #
 set(BINDINGS_DIR     "${CMAKE_CURRENT_BINARY_DIR}/ipfs_bindings")
-set(BINDINGS_HEADER  "${BINDINGS_DIR}/ipfs-bindings.h")
 set(GOPATH_IPFS_DIR  "${GOPATH}/src/github.com/equalitie/asio-ipfs")
 
 if (LINUX)
+    set(BINDINGS_HEADER  "${BINDINGS_DIR}/libipfs-bindings.h")
     set(BINDINGS_LIBRARY "${BINDINGS_DIR}/libipfs-bindings.a")
     set(BINDINGS_OUTPUT  ${BINDINGS_HEADER} ${BINDINGS_LIBRARY})
 
@@ -182,6 +182,7 @@ if (LINUX)
                     ./src/ipfs_bindings
     )
 elseif(WIN64)
+    set(BINDINGS_HEADER  "${BINDINGS_DIR}/ipfs-bindings.h")
     set(BINDINGS_LIBRARY "${BINDINGS_DIR}/ipfs-bindings.lib")
     set(BINDINGS_DLL     "${BINDINGS_DIR}/ipfs-bindings.dll")
     set(BINDINGS_DEF     "${BINDINGS_DIR}/ipfs-bindings.def")
@@ -227,7 +228,7 @@ add_custom_target(ipfs-bindings-build ALL
     DEPENDS ${BINDINGS_OUTPUT}
 )
 
-if (BEAM_SIGN_PACKAGE AND WIN32)
+if (BEAM_SIGN_PACKAGE AND WINDOWS)
     add_custom_command(
         TARGET ipfs-bindings-build POST_BUILD
         COMMAND ${SIGNTOOL_EXECUTABLE} sign ${SIGNTOOL_OPTIONS} ${BINDINGS_DLL}
@@ -236,10 +237,10 @@ endif()
 
 if (WINDOWS)
     add_library(ipfs-bindings SHARED IMPORTED GLOBAL
-        DEPENDS ipfs-bindings-build
+        DEPENDS ipfs-bindings-build 
     )
 
-    set_property(TARGET ipfs-bindings PROPERTY
+    set_target_properties(ipfs-bindings PROPERTIES
         IMPORTED_LOCATION ${BINDINGS_DLL}
         IMPORTED_IMPLIB ${BINDINGS_LIBRARY}
     )
