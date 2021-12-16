@@ -41,7 +41,14 @@ elseif("${CMAKE_SYSTEM_NAME}" STREQUAL "Windows")
     else()
          message(FATAL_ERROR "Unsupported host architecture ${CMAKE_SYSTEM_PROCESSOR}")
     endif()
-
+elseif("${CMAKE_SYSTEM_NAME}" STREQUAL "Darwin")
+    set(DARWIN TRUE)
+    if ("${CMAKE_SYSTEM_PROCESSOR}" STREQUAL "x86_64")
+        set(DARWIN64 TRUE)
+        set(X64 TRUE)
+    else()
+         message(FATAL_ERROR "Unsupported host architecture ${CMAKE_SYSTEM_PROCESSOR}")
+    endif()
 else()
     message(FATAL_ERROR "Unsupported host platform ${CMAKE_SYSTEM_NAME}")
 endif()
@@ -56,6 +63,13 @@ if (LINUX64)
     set(GOSRC       "https://dl.google.com/go/go1.16.10.linux-amd64.tar.gz")
     set(GOSRC_HASH  "414cd18ce1d193769b9e97d2401ad718755ab47816e13b2a1cde203d263b55cf")
     set(GOOS        "linux")
+    set(GOARCH      "amd64")
+endif()
+
+if (DARWIN64)
+    set(GOSRC       "https://dl.google.com/go/go1.16.10.darwin-amd64.tar.gz")
+    set(GOSRC_HASH  "895a3fe6d720297ce16272f41c198648da8675bb244ab6d60003265c176b6c48")
+    set(GOOS        "darwin")
     set(GOARCH      "amd64")
 endif()
 
@@ -181,6 +195,42 @@ if (LINUX)
                     -o ${BINDINGS_LIBRARY}
                     ./src/ipfs_bindings
     )
+
+elseif (DARWIN)
+    set(BINDINGS_HEADER  "${BINDINGS_DIR}/libipfs-bindings.h")
+    set(BINDINGS_LIBRARY "${BINDINGS_DIR}/libipfs-bindings.a")
+    set(BINDINGS_OUTPUT  ${BINDINGS_HEADER} ${BINDINGS_LIBRARY})
+
+    add_custom_command(
+        OUTPUT  ${BINDINGS_OUTPUT}
+        DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/include/asio_ipfs/ipfs_error_codes.h
+                ${CMAKE_CURRENT_SOURCE_DIR}/src/ipfs_bindings/ipfs_bindings.go
+                golang
+
+        COMMAND ${CMAKE_COMMAND} -E make_directory ${BINDINGS_DIR}
+            && ${CMAKE_COMMAND} -E make_directory ${GOPATH_IPFS_DIR}
+            && ${CMAKE_COMMAND} -E copy_directory ${CMAKE_CURRENT_SOURCE_DIR}/include ${GOPATH_IPFS_DIR}/include
+            && ${CMAKE_COMMAND} -E copy_directory ${CMAKE_CURRENT_SOURCE_DIR}/src ${GOPATH_IPFS_DIR}/src
+            && ${CMAKE_COMMAND} -E copy ${CMAKE_CURRENT_SOURCE_DIR}/go.mod ${GOPATH_IPFS_DIR}
+            && ${CMAKE_COMMAND} -E copy ${CMAKE_CURRENT_SOURCE_DIR}/go.sum ${GOPATH_IPFS_DIR}
+
+        COMMAND cd ${GOPATH_IPFS_DIR}
+             && export GOROOT=${GOROOT}
+             && export GOPATH=${GOPATH}
+             && export GOOS=${GOOS}
+             && export GOARCH=${GOARCH}
+             && export GOARM=${GOARM}
+             && export CGO_ENABLED=1
+             && export CC=${CMAKE_C_COMPILER}
+             && export GO111MODULE=on
+             && export GOGCCFLAGS="-m64 -mthreads -fno-caret-diagnostics -Qunused-arguments -fmessage-length=0 -gno-record-gcc-switches"
+             && ${GOROOT}/bin/go build
+                    --buildmode=c-archive
+                    -ldflags "-s -w"
+                    -modcacherw
+                    -o ${BINDINGS_LIBRARY}
+                    ./src/ipfs_bindings
+    )
 elseif(WIN64)
     set(BINDINGS_HEADER  "${BINDINGS_DIR}/ipfs-bindings.h")
     set(BINDINGS_LIBRARY "${BINDINGS_DIR}/ipfs-bindings.lib")
@@ -248,7 +298,7 @@ if (WINDOWS)
     install(IMPORTED_RUNTIME_ARTIFACTS ipfs-bindings RUNTIME DESTINATION .)
 endif()
 
-if (LINUX)
+if (LINUX OR DARWIN)
     add_library(ipfs-bindings STATIC IMPORTED GLOBAL
         DEPENDS ipfs-bindings-build
     )
