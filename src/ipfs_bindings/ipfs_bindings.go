@@ -81,11 +81,11 @@ const (
 )
 
 type Config struct {
-	Online      bool     `json:"online"`
-	LowWater    int      `json:"low_water"`
-	HighWater   int      `json:"high_water"`
-	GracePeriod string   `json:"grace_period"`
-	Bootstrap   []string `json:"bootstrap"`
+	Online      bool     `json:"Online"`
+	LowWater    int      `json:"LowWater"`
+	HighWater   int      `json:"HighWater"`
+	GracePeriod string   `json:"GracePeriod"`
+	Bootstrap   []string `json:"Bootstrap"`
 }
 
 func main() {
@@ -148,6 +148,7 @@ func openOrCreateRepo(repoRoot string, c Config) (repo.Repo, error) {
 		conf.Swarm.ConnMgr.LowWater = c.LowWater
 		conf.Swarm.ConnMgr.HighWater = c.HighWater
 		conf.Swarm.ConnMgr.GracePeriod = c.GracePeriod
+		fmt.Println("openOrCreateRepo GracePeriod:", c.GracePeriod)
 
         //
         // Bootstrap peers
