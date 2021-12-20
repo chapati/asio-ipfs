@@ -16,6 +16,7 @@ import (
 	"io/ioutil"
 	"encoding/json"
 	"path/filepath"
+	"strconv"
 	core "github.com/ipfs/go-ipfs/core"
 	coreapi "github.com/ipfs/go-ipfs/core/coreapi"
 	corerepo "github.com/ipfs/go-ipfs/core/corerepo"
@@ -81,33 +82,16 @@ const (
 )
 
 type Config struct {
-	Online      bool     `json:"Online"`
-	LowWater    int      `json:"LowWater"`
-	HighWater   int      `json:"HighWater"`
-	GracePeriod string   `json:"GracePeriod"`
-	Bootstrap   []string `json:"Bootstrap"`
+	Online         bool      `json:"Online"`
+	LowWater       int       `json:"LowWater"`
+	HighWater      int       `json:"HighWater"`
+	GracePeriod    string    `json:"GracePeriod"`
+	Bootstrap      []string  `json:"Bootstrap"`
+	NodeSwarmPort  int       `json:"NodeSwarmPort"`
 }
 
 func main() {
 }
-
-func doesnt_exist_or_is_empty(path string) bool {
-	f, err := os.Open(path)
-	if err != nil {
-		if os.IsNotExist(err) {
-			return true
-		}
-		return false
-	}
-	defer f.Close()
-
-	_, err = f.Readdirnames(1)
-	if err == io.EOF {
-		return true
-	}
-	return false
-}
-
 
 // "/ip4/0.0.0.0/tcp/4001" -> "/ip4/0.0.0.0/tcp/0"
 // "/ip6/::/tcp/4001"      -> "/ip6/::/tcp/0"
@@ -123,61 +107,146 @@ func setRandomPort(ep string) string {
 	return strings.Join(parts, "/")
 }
 
-func openOrCreateRepo(repoRoot string, c Config) (repo.Repo, error) {
-	if doesnt_exist_or_is_empty(repoRoot) {
-		conf, err := config.Init(os.Stdout, nBitsForKeypair)
-		//fmt.Printf("%v", conf);
+// TODO:IPFS
+// SupportedTransportStrings is the list of supported transports for the swarm.
+// These are strings of encapsulated multiaddr protocols. E.g.:
+//   /ip4/tcp
+//var SupportedTransportStrings = []string{
+//	"/ip4/tcp",
+//	"/ip6/tcp",
+//	"/ip4/udp/utp",
+//	"/ip6/udp/utp",
+//	"/ip4/tcp/ws",
+//	"/ip6/tcp/ws",
+//
+func updateConfig(conf *config.Config, c *Config) error {
+    conf.Swarm.ConnMgr.LowWater = c.LowWater
+    conf.Swarm.ConnMgr.HighWater = c.HighWater
+    conf.Swarm.ConnMgr.GracePeriod = c.GracePeriod
 
-		if err != nil {
-			return nil, err
-		}
-
-		// Don't use hardcoded swarm ports (usually 4001), otherwise
-		// we wouldn't be able to run multiple IPFS instances on the
-		// same PC.
-		for i, addr := range conf.Addresses.Swarm {
-			conf.Addresses.Swarm[i] = setRandomPort(addr)
-		}
-
-        // TODO:IPFS check --enable-gc
-        // TODO:IPFS check if QUIC is already in conf.Addresses
-		//if (enableQuic) {
-		//	conf.Experimental.QUIC = true
-		//	conf.Addresses.Swarm = append(conf.Addresses.Swarm, "/ip4/0.0.0.0/udp/0/quic")
-		//}
-		conf.Swarm.ConnMgr.LowWater = c.LowWater
-		conf.Swarm.ConnMgr.HighWater = c.HighWater
-		conf.Swarm.ConnMgr.GracePeriod = c.GracePeriod
-		fmt.Println("openOrCreateRepo GracePeriod:", c.GracePeriod)
-
-        //
-        // Bootstrap peers
-        //
-        {
-            if len (c.Bootstrap) == 0 {
-                return nil, fmt.Errorf("Config.Bootstrap cannot be empty")
-            }
-
-            ps, err :=  config.ParseBootstrapPeers(c.Bootstrap)
-            if err != nil {
-                return nil, fmt.Errorf("Failed to parse bootstrap peers: %s", err)
-            }
-
-            conf.Bootstrap = config.BootstrapPeerStrings(ps)
+    var replacePort = func (addr string, proto int, prefix string) (string, error) {
+        maddr, err := ma.NewMultiaddr(addr)
+        if err != nil {
+            return "", err
         }
 
-		// TODO:IPFS /dnsaddr/
-		// TODO:IPFS change to default ports
-		// TODO:IPFS api server & web ui?
-		// TODO:IPFS why pins are not shown in web UI?
-		// TODO:IPFS ensure we're not on a public network, what is indirect pin?
-		// TODO:IPFS & setenforce
-		// TODO:IPFS PASS SWARM KEY
-		if err := fsrepo.Init(repoRoot, conf); err != nil {
+        ma.ForEach(maddr, func(comp ma.Component) bool {
+            if comp.Protocol().Code == proto {
+                sport := comp.Value()
+                what := prefix + sport
+                with := prefix + strconv.FormatInt(int64(c.NodeSwarmPort), 10)
+                addr = strings.Replace(addr, what, with, -1)
+            }
+            return true
+        })
+
+        return addr, nil
+    }
+
+    for idx, addr := range conf.Addresses.Swarm {
+        addr, err := replacePort(addr, ma.P_TCP, "/tcp/")
+        if err != nil {
+            return err
+        }
+
+        addr, err = replacePort(addr, ma.P_UDP, "/udp/")
+        if err != nil {
+            return err
+        }
+
+        conf.Addresses.Swarm[idx] = addr
+    }
+
+    return nil
+}
+
+func openOrCreateRepo(repoRoot string, c Config) (repo.Repo, error) {
+	if fsrepo.IsInitialized(repoRoot) {
+	    //
+        // We ensure that config passed from outside
+        // is written into the IPFS repository
+        //
+        // TODO:IPFS add overwrite option. Allow in UI, disable for CLI?
+        repo, err := fsrepo.Open(repoRoot)
+        if err != nil {
             return nil, err
         }
 
-        // Manually add swarm key
+        conf, err := repo.Config()
+        if err != nil {
+            return nil, err
+        }
+
+        conf, err = conf.Clone()
+        if err != nil {
+            return nil, err
+        }
+
+        //
+        // Ensure our config values
+        //
+        err = updateConfig(conf, &c)
+        if err != nil {
+            return nil, err
+        }
+
+        err = repo.SetConfig(conf)
+        if err != nil {
+            return nil, err
+        }
+
+        return repo, nil
+	}
+
+	//
+	// Here we initialize new repository
+	//
+    conf, err := config.Init(os.Stdout, nBitsForKeypair)
+    if err != nil {
+        return nil, err
+    }
+
+    //
+    // And write our config values
+    //
+    err = updateConfig(conf, &c)
+    if err != nil {
+        return nil, err
+    }
+
+    //
+    // BEAM Bootstrap peers
+    //
+    {
+        if len (c.Bootstrap) == 0 {
+            return nil, fmt.Errorf("Config.Bootstrap cannot be empty")
+        }
+
+        ps, err :=  config.ParseBootstrapPeers(c.Bootstrap)
+        if err != nil {
+            return nil, fmt.Errorf("Failed to parse bootstrap peers: %s", err)
+        }
+
+        conf.Bootstrap = config.BootstrapPeerStrings(ps)
+    }
+
+    // TODO:IPFS /dnsaddr/
+    // TODO:IPFS change to default ports
+    // TODO:IPFS api server & web ui?
+    // TODO:IPFS why pins are not shown in web UI?
+    // TODO:IPFS ensure we're not on a public network, what is indirect pin?
+    // TODO:IPFS & setenforce
+    if err := fsrepo.Init(repoRoot, conf); err != nil {
+        return nil, err
+    }
+
+    //
+    // Manually add swarm key
+    // We're forcing private repository mode
+    // TODO:IPFS make configurable
+    // N.B. If decide to switch to a public network need to update QUIC settings & ports
+    //
+    {
         repoPath := filepath.Clean(repoRoot)
         spath := filepath.Join(repoPath, "swarm.key")
 
@@ -191,9 +260,10 @@ func openOrCreateRepo(repoRoot string, c Config) (repo.Repo, error) {
         if err != nil {
             return nil, err
         }
-	}
+    }
 
-	return fsrepo.Open(repoRoot)
+    // Finally
+    return fsrepo.Open(repoRoot)
 }
 
 func printSwarmAddrs(node *core.IpfsNode) {
@@ -308,7 +378,7 @@ func start_node(cfg_json string, n *Node, repoRoot string) C.int {
 
 	if err != nil {
 		fmt.Println("Failed to parse config ", err);
-		return C.IPFS_FAILED_TO_CREATE_REPO
+		return C.IPFS_FAILED_TO_PARSE_CONFIG
 	}
 
 	err = mprome.Inject()
@@ -334,15 +404,19 @@ func start_node(cfg_json string, n *Node, repoRoot string) C.int {
 		return C.IPFS_FAILED_TO_CREATE_REPO
 	}
 
-	cfg, err := fsrepo.ConfigAt(repoRoot);
+	cfg, err := r.Config()
+	if err != nil {
+	    fmt.Println("err", err);
+        return C.IPFS_FAILED_TO_CREATE_REPO
+	}
 
     start := time.Now()
 	n.node, err = core.NewNode(n.ctx, &core.BuildCfg{
-       Online: c.Online,
+       Online:    c.Online,
        Permanent: true,
-       Repo:   r,
+       Repo:      r,
        ExtraOpts: map[string]bool{
-           "ipnsps": enablePubSubIPNS,
+           "ipnsps": enablePubSubIPNS, //TODO:IPFS do we need this?
        },
    })
 

@@ -2,10 +2,9 @@
 
 #include <string>
 #include <boost/system/error_code.hpp>
-
 #include <asio_ipfs/ipfs_error_codes.h>
 
-namespace asio_ipfs { namespace error {
+namespace asio_ipfs::error {
 
     struct ipfs_error {
         int error_number;
@@ -20,12 +19,12 @@ namespace asio_ipfs { namespace error {
     
     struct ipfs_category : public boost::system::error_category
     {
-        const char* name() const noexcept override
+        [[nodiscard]] const char* name() const noexcept override
         {
             return "ipfs_errors";
         }
-    
-        std::string message(int e) const override
+
+        [[nodiscard]] std::string message(int e) const override
         {
             switch (e) {
                 case IPFS_SUCCESS:
@@ -34,6 +33,8 @@ namespace asio_ipfs { namespace error {
                     return "failed to resolve IPNS entry";
                 case IPFS_FAILED_TO_START_NODE:
                     return "failed to start IPFS node";
+                case IPFS_FAILED_TO_PARSE_CONFIG:
+                    return "failed to parse IPFS config";
                 case IPFS_FAILED_TO_CREATE_REPO:
                     return "failed to create IPFS repository";
                 case IPFS_ADD_FAILED:
@@ -56,12 +57,12 @@ namespace asio_ipfs { namespace error {
     
     struct asio_ipfs_category : public boost::system::error_category
     {
-        const char* name() const noexcept override
+        [[nodiscard]] const char* name() const noexcept override
         {
             return "asio_ipfs_errors";
         }
-    
-        std::string message(int e) const override
+
+        [[nodiscard]] std::string message(int e) const override
         {
             switch (e) {
                 case error::db_download_failed:
@@ -84,13 +85,12 @@ namespace asio_ipfs { namespace error {
     boost::system::error_code
     make_error_code(::asio_ipfs::error::error_t);
 
-}} // asio_ipfs::error namespace
+} // asio_ipfs::error namespace
 
-namespace boost { namespace system {
-
+namespace boost::system {
     template<>
     struct is_error_code_enum<::asio_ipfs::error::error_t>
-        : public std::true_type {};
-
-
-}} // boost::system namespace
+        : public std::true_type
+    {
+    };
+}

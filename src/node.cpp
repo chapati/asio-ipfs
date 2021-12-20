@@ -191,11 +191,12 @@ static string config_to_json(config cfg)
 
     auto json = nlohmann::json
     {
-        {"Online",      cfg.online},
-        {"LowWater",    cfg.low_water},
-        {"HighWater",   cfg.high_water},
-        {"GracePeriod", std::to_string(cfg.grace_period) + std::string("s")},
-        {"Bootstrap",   cfg.bootstrap}
+        {"Online",        cfg.online},
+        {"LowWater",      cfg.low_water},
+        {"HighWater",     cfg.high_water},
+        {"GracePeriod",   std::to_string(cfg.grace_period) + std::string("s")},
+        {"Bootstrap",     cfg.bootstrap},
+        {"NodeSwarmPort", cfg.node_swarm_port}
     };
 
     return json.dump();

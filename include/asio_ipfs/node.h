@@ -50,7 +50,7 @@ public:
     build(boost::asio::io_service&, const std::string& repo_path, config, Cancel&, Token&&);
 
     // Returns this node's IPFS ID
-    std::string id() const;
+    [[nodiscard]] std::string id() const;
 
     template<class Token>
     typename Result<Token, std::string>::return_type
