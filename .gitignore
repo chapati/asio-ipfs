@@ -61,3 +61,6 @@ cmake-build-*/
 
 out/
 golang/
+go-workspace/
+golang-prefix/
+src/.DS_Store
