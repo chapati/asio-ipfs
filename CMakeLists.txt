@@ -215,24 +215,18 @@ elseif (DARWIN)
             && ${CMAKE_COMMAND} -E copy ${CMAKE_CURRENT_SOURCE_DIR}/go.sum ${GOPATH_IPFS_DIR}
 
         COMMAND cd ${GOPATH_IPFS_DIR}
-            # && export GOROOT=${GOROOT}
-             #&& export GOPATH=${GOPATH}
-             #&& export GOOS=${GOOS}
-             #&& export GOARCH=${GOARCH}
-             #&& export GOARM=${GOARM}
-             #&& export CGO_ENABLED=1
-             #&& export CC=${CMAKE_C_COMPILER}
-            #  && export GO111MODULE=on
-            #  && export CGO_LDFLAGS=""
-            #  && echo "CGO_CFLAGS=$ENV{CGO_CFLAGS}"
-            #  && echo "CGO_LDFLAGS=$ENV{CGO_LDFLAGS}"
-            # && export CGO_LDFLAGS='-framework CoreFoundation -framework Security'
-            #  && export CGO_CFLAGS="-g -O2 --sysroot=/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX12.1.sdk"
-            #  && export GOGCCFLAGS="-v -H -m64 -fno-caret-diagnostics -Qunused-arguments -fmessage-length=0 -gno-record-gcc-switches"
+             && export GOROOT=${GOROOT}
+             && export GOPATH=${GOPATH}
+             && export GOOS=${GOOS}
+             && export GOARCH=${GOARCH}
+             && export GOARM=${GOARM}
+             && export CGO_ENABLED=1
+             && export CC=clang
+             && export GO111MODULE=on
+             && export GOGCCFLAGS="-m64 -fno-caret-diagnostics -Qunused-arguments -fmessage-length=0 -gno-record-gcc-switches"
              && ${GOROOT}/bin/go build
                     --buildmode=c-archive
                     -ldflags "-s -w"
-                    -x
                     -modcacherw
                     -o ${BINDINGS_LIBRARY}
                     ./src/ipfs_bindings
