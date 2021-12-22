@@ -3,7 +3,7 @@
 # TODO:IPFS MacOS
 # TODO:IPFS Android ?
 # TODO:IPFS WebAssembly (switch off)
-cmake_minimum_required (VERSION 3.13)
+cmake_minimum_required (VERSION 3.21)
 
 project(asio-ipfs)
 include(ExternalProject)
