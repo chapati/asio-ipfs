@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"context"
 	"os"
+	"errors"
 	"sort"
 	"unsafe"
 	"time"
@@ -67,7 +68,7 @@ import "C"
 
 const (
 	nBitsForKeypair = 2048
-	repoRoot = "./repo"
+	configLock = "config.lock"
 	debug = false
 
 	// This next option makes IPNS resolution much faster:
@@ -93,18 +94,17 @@ type Config struct {
 func main() {
 }
 
-// "/ip4/0.0.0.0/tcp/4001" -> "/ip4/0.0.0.0/tcp/0"
-// "/ip6/::/tcp/4001"      -> "/ip6/::/tcp/0"
-func setRandomPort(ep string) string {
-    fmt.Printf("addr %s\n", ep)
-	parts := strings.Split(ep, "/")
-	l := len(parts);
-	for i := 0; i < l; i++ {
-	    if parts[i] == "4001" {
-	        parts[i] = "0"
-	    }
-	}
-	return strings.Join(parts, "/")
+func formRepoPath(repoRoot string, fname string) string {
+    repoPath := filepath.Clean(repoRoot)
+    return filepath.Join(repoPath, fname)
+}
+
+func configUnlocked(repoRoot string) bool {
+    cpath := formRepoPath(repoRoot, configLock)
+    if _, err := os.Stat(cpath); errors.Is(err, os.ErrNotExist) {
+        return true
+    }
+    return false
 }
 
 // TODO:IPFS
@@ -124,6 +124,9 @@ func updateConfig(conf *config.Config, c *Config) error {
     conf.Swarm.ConnMgr.HighWater = c.HighWater
     conf.Swarm.ConnMgr.GracePeriod = c.GracePeriod
 
+    //
+    // Swarm ports
+    //
     var replacePort = func (addr string, proto int, prefix string) (string, error) {
         maddr, err := ma.NewMultiaddr(addr)
         if err != nil {
@@ -157,6 +160,42 @@ func updateConfig(conf *config.Config, c *Config) error {
         conf.Addresses.Swarm[idx] = addr
     }
 
+    //
+    // Bootstrap peers
+    //
+    if len (c.Bootstrap) == 0 {
+        fmt.Println("WARNING: empty bootstrap peers in config. Default IPFS bootstrap peers would be used.")
+    } else {
+        ps, err :=  config.ParseBootstrapPeers(c.Bootstrap)
+        if err != nil {
+            return fmt.Errorf("Failed to parse bootstrap peers: %s", err)
+        }
+        conf.Bootstrap = config.BootstrapPeerStrings(ps)
+    }
+
+    return nil
+}
+
+func updateRepo(repoRoot string) error {
+    //
+    // Manually add swarm key
+    // We're forcing private repository mode
+    // TODO:IPFS make configurable
+    // N.B. If decide to switch to a public network need to update QUIC settings & ports
+    //
+    spath := formRepoPath(repoRoot, "swarm.key")
+
+    f, err := os.Create(spath)
+    if err != nil {
+        return err
+    }
+    defer f.Close()
+
+    _, err = f.WriteString("/key/swarm/psk/1.0.0/\n/base16/\n1191aea7c9f99f679f477411d9d44f1ea0fdf5b42d995966b14a9000432f8c4a")
+    if err != nil {
+        return err
+    }
+
     return nil
 }
 
@@ -183,15 +222,24 @@ func openOrCreateRepo(repoRoot string, c Config) (repo.Repo, error) {
         }
 
         //
-        // Ensure our config values
+        // If there is no confgLock ensure our config values
         //
-        err = updateConfig(conf, &c)
-        if err != nil {
+        locked := !configUnlocked(repoRoot)
+
+        if locked {
+            fmt.Printf("WARNING: IPFS config is locked via %s. Config would be read from repository.\n", configLock)
+            return repo, nil
+        }
+
+        if err = updateConfig(conf, &c); err != nil {
             return nil, err
         }
 
-        err = repo.SetConfig(conf)
-        if err != nil {
+        if err = repo.SetConfig(conf); err != nil {
+            return nil, err
+        }
+
+        if err = updateRepo(repoRoot); err != nil {
             return nil, err
         }
 
@@ -214,52 +262,18 @@ func openOrCreateRepo(repoRoot string, c Config) (repo.Repo, error) {
         return nil, err
     }
 
-    //
-    // BEAM Bootstrap peers
-    //
-    {
-        if len (c.Bootstrap) == 0 {
-            return nil, fmt.Errorf("Config.Bootstrap cannot be empty")
-        }
-
-        ps, err :=  config.ParseBootstrapPeers(c.Bootstrap)
-        if err != nil {
-            return nil, fmt.Errorf("Failed to parse bootstrap peers: %s", err)
-        }
-
-        conf.Bootstrap = config.BootstrapPeerStrings(ps)
-    }
-
     // TODO:IPFS /dnsaddr/
     // TODO:IPFS change to default ports
     // TODO:IPFS api server & web ui?
     // TODO:IPFS why pins are not shown in web UI?
     // TODO:IPFS ensure we're not on a public network, what is indirect pin?
     // TODO:IPFS & setenforce
-    if err := fsrepo.Init(repoRoot, conf); err != nil {
+    if err = fsrepo.Init(repoRoot, conf); err != nil {
         return nil, err
     }
 
-    //
-    // Manually add swarm key
-    // We're forcing private repository mode
-    // TODO:IPFS make configurable
-    // N.B. If decide to switch to a public network need to update QUIC settings & ports
-    //
-    {
-        repoPath := filepath.Clean(repoRoot)
-        spath := filepath.Join(repoPath, "swarm.key")
-
-        f, err := os.Create(spath)
-        if err != nil {
-            return nil, err
-        }
-        defer f.Close()
-
-        _, err = f.WriteString("/key/swarm/psk/1.0.0/\n/base16/\n1191aea7c9f99f679f477411d9d44f1ea0fdf5b42d995966b14a9000432f8c4a")
-        if err != nil {
-            return nil, err
-        }
+    if err = updateRepo(repoRoot); err != nil {
+        return nil, err
     }
 
     // Finally
@@ -450,7 +464,7 @@ func start_node(cfg_json string, n *Node, repoRoot string) C.int {
 
     // TODO:IPFS print this every several minutes
     if len(peers) == 0 {
-        fmt.Println("WARNING: IPFS has no peers")
+        fmt.Println("WARNING: IPFS was unable to connect to peers")
     } else {
         for _, peer := range peers {
             fmt.Printf("IPFS Peer %v %v\n", peer.ID().Pretty(), peer.Address().String())

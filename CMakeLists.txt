@@ -1,7 +1,3 @@
-# TODO:IPFS support non-ipfs version of api, needed for ethash_service
-# TODO:IPFS non-ipfs version of wallet-api
-# TODO:IPFS Android ?
-# TODO:IPFS WebAssembly (switch off)
 cmake_minimum_required (VERSION 3.13)
 
 project(asio-ipfs)
