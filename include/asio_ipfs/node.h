@@ -31,7 +31,7 @@ public:
     // This constructor may do repository initialization disk IO and as such
     // may block for a second or more. If that is undesired, use the static
     // async `node::build` function instead.
-    node(boost::asio::io_service&, const std::string& repo_path, config);
+    node(boost::asio::io_service&, config);
 
     node(node&&);
     node& operator=(node&&);
@@ -42,12 +42,12 @@ public:
     template<class Token>
     static
     typename Result<Token, std::unique_ptr<node>>::return_type
-    build(boost::asio::io_service&, const std::string& repo_path, config, Token&&);
+    build(boost::asio::io_service&, config, Token&&);
 
     template<class Token>
     static
     typename Result<Token, std::unique_ptr<node>>::return_type
-    build(boost::asio::io_service&, const std::string& repo_path, config, Cancel&, Token&&);
+    build(boost::asio::io_service&, config, Cancel&, Token&&);
 
     // Returns this node's IPFS ID
     [[nodiscard]] std::string id() const;
@@ -128,7 +128,6 @@ private:
 private:
     static
     void build_( boost::asio::io_service& ios
-               , const std::string& repo_path
                , config
                , Cancel* cancel
                , std::function<void( const boost::system::error_code&
@@ -178,14 +177,13 @@ template<class Token>
 inline
 typename node::Result<Token, std::unique_ptr<node>>::return_type
 node::build( boost::asio::io_service& ios
-           , const std::string& repo_path
            , config cfg
            , Token&& token)
 {
     using BackendP = std::unique_ptr<node>;
     Handler<Token, BackendP> handler(std::forward<Token>(token));
     Result<Token, BackendP> result(handler);
-    build_(ios, repo_path, cfg, nullptr, std::move(handler));
+    build_(ios, cfg, nullptr, std::move(handler));
     return result.get();
 }
 
@@ -193,7 +191,6 @@ template<class Token>
 inline
 typename node::Result<Token, std::unique_ptr<node>>::return_type
 node::build( boost::asio::io_service& ios
-           , const std::string& repo_path
            , config cfg
            , Cancel& cancel
            , Token&& token)
@@ -201,7 +198,7 @@ node::build( boost::asio::io_service& ios
     using BackendP = std::unique_ptr<node>;
     Handler<Token, BackendP> handler(std::forward<Token>(token));
     Result<Token, BackendP> result(handler);
-    build_(ios, repo_path, cfg, &cancel, std::move(handler));
+    build_(ios, cfg, &cancel, std::move(handler));
     return result.get();
 }
 

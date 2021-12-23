@@ -7,6 +7,7 @@ namespace asio_ipfs
 {
     struct config {
         bool online = true;
+        std::string repo_root = "./ipfs-repo";
         unsigned int low_water = 100;
         unsigned int high_water = 200;
         unsigned int grace_period = 20;

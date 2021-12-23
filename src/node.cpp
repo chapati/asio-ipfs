@@ -191,6 +191,7 @@ static string config_to_json(config cfg)
 
     auto json = nlohmann::json
     {
+        {"RepoRoot",      cfg.repo_root},
         {"Online",        cfg.online},
         {"LowWater",      cfg.low_water},
         {"HighWater",     cfg.high_water},
@@ -202,14 +203,14 @@ static string config_to_json(config cfg)
     return json.dump();
 }
 
-node::node(asio::io_service& ios, const string& repo_path, config cfg)
+node::node(asio::io_service& ios, config cfg)
 {
     string cfg_s = config_to_json(cfg);
 
     uint64_t ipfs_handle = go_asio_ipfs_allocate();
     int ec = go_asio_ipfs_start_blocking( ipfs_handle
                                         , (char*) cfg_s.c_str()
-                                        , (char*) repo_path.data());
+                                        , (char*) cfg.repo_root.data());
 
     if (ec != IPFS_SUCCESS) {
         go_asio_ipfs_free(ipfs_handle);
@@ -221,7 +222,6 @@ node::node(asio::io_service& ios, const string& repo_path, config cfg)
 }
 
 void node::build_( asio::io_service& ios
-                 , const string& repo_path
                  , config cfg
                  , Cancel* cancel
                  , function<void( const sys::error_code& ec
@@ -252,7 +252,7 @@ void node::build_( asio::io_service& ios
                       , cancel
                       , cb_
                       , go_asio_ipfs_start_async, (char*) cfg_s.c_str()
-                                                , (char*) repo_path.data());
+                                                , (char*) cfg.repo_root.data());
 }
 
 node::node() = default;
