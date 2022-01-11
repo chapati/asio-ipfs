@@ -16,6 +16,7 @@
 #define IPFS_PIN_FAILED              9  // failed to publish CID
 #define IPFS_UNPIN_FAILED           10  // failed to unpin CID
 #define IPFS_GC_FAILED              11  // failed to garbage collect
+#define IPFS_NO_NODE                12  // failed to find a node by handle
 
 
 #endif  // ndef GUARD_ipfs_error_codes_h

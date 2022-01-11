@@ -49,6 +49,8 @@ namespace asio_ipfs::error {
                     return "failed to pin";
                 case IPFS_UNPIN_FAILED:
                     return "failed to unpin";
+                case IPFS_NO_NODE:
+                    return "failed to find a node";
                 default:
                     return "unknown ipfs error";
             }

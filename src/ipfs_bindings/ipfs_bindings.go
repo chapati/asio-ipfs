@@ -298,6 +298,7 @@ func printSwarmAddrs(node *core.IpfsNode) {
 
 type Node struct {
 	node *core.IpfsNode
+	collector *corehttp.IpfsNodeCollector
 	api coreiface.CoreAPI
 	ctx context.Context
 	cancel context.CancelFunc
@@ -311,7 +312,9 @@ type Node struct {
 
 var g_next_node_id uint64 = 0
 var g_nodes = make(map[uint64]*Node)
-
+var g_injected = false
+var g_flatfsPlugins = false
+var g_leveldsPlugins = false
 
 //export go_asio_ipfs_allocate
 func go_asio_ipfs_allocate() uint64 {
@@ -330,9 +333,22 @@ func go_asio_ipfs_allocate() uint64 {
 }
 
 //export go_asio_ipfs_free
-func go_asio_ipfs_free(handle uint64) {
-	g_nodes[handle].cancel()
+func go_asio_ipfs_free(handle uint64) C.int {
+    n, ok := g_nodes[handle]
+    if !ok {
+        return C.IPFS_NO_NODE
+    }
+
+	n.cancel()
+	if n.collector != nil {
+        prometheus.Unregister(n.collector)
+    }
+
+    // TODO:IPFS check if we need uninject mprome g_injected
+    // TODO:IPFS uninject plugins g_leveldsPlugins, g_flatfsPlugins
+
 	delete(g_nodes, handle)
+	return C.IPFS_SUCCESS
 }
 
 
@@ -395,24 +411,33 @@ func start_node(cfg_json string, n *Node, repoRoot string) C.int {
 		return C.IPFS_FAILED_TO_PARSE_CONFIG
 	}
 
-	err = mprome.Inject()
-
-	if err != nil {
-		fmt.Println("err");
-		return C.IPFS_FAILED_TO_CREATE_REPO // FIXME
+    if !g_injected {
+	    err = mprome.Inject()
+	    if err != nil {
+		    fmt.Println("mprome err", err)
+		    return C.IPFS_FAILED_TO_CREATE_REPO // TODO:IPFS FIXME
+	    }
+	     g_injected = true
 	}
 
-    // TODO:IPFS check how plugins are started in https://github.com/ipfs/go-ipfs/blob/029d82c4ea9d73f485b30e5f5100c86502308375/cmd/ipfs/daemon.go
-	pr1 := loadPlugins(flatfs.Plugins);
-	pr2 := loadPlugins(levelds.Plugins);
+	// TODO:IPFS check how plugins are started in https://github.com/ipfs/go-ipfs/blob/029d82c4ea9d73f485b30e5f5100c86502308375/cmd/ipfs/daemon.go
+	if !g_flatfsPlugins {
+        g_flatfsPlugins = loadPlugins(flatfs.Plugins)
+        if !g_flatfsPlugins {
+            fmt.Println("Failed to load flatfs plugins")
+            return C.IPFS_FAILED_TO_CREATE_REPO
+        }
+    }
 
-	if !pr1 || !pr2 {
-		fmt.Println("Failed to load plugins")
-		return C.IPFS_FAILED_TO_CREATE_REPO
-	}
+    if !g_leveldsPlugins {
+        g_leveldsPlugins = loadPlugins(levelds.Plugins)
+        if !g_leveldsPlugins {
+            fmt.Println("Failed to load levelds plugins")
+            return C.IPFS_FAILED_TO_CREATE_REPO
+        }
+    }
 
 	r, err := openOrCreateRepo(repoRoot, c);
-
 	if err != nil {
 		fmt.Println("err", err);
 		return C.IPFS_FAILED_TO_CREATE_REPO
@@ -444,10 +469,10 @@ func start_node(cfg_json string, n *Node, repoRoot string) C.int {
 
     // TODO:IPFS do we need this?
 	n.node.IsDaemon = true
-
 	printSwarmAddrs(n.node)
 
-	prometheus.MustRegister(&corehttp.IpfsNodeCollector{Node: n.node})
+    n.collector = &corehttp.IpfsNodeCollector{Node: n.node}
+	prometheus.MustRegister(n.collector)
 
 	api, err := coreapi.NewCoreAPI(n.node)
 	if err != nil {
