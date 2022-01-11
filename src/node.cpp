@@ -221,6 +221,24 @@ node::node(asio::io_service& ios, config cfg)
     _impl->ipfs_handle = ipfs_handle;
 }
 
+node::~node()
+{
+    if (_impl) {
+        // Make sure all handlers get completed.
+        while (!_impl->handles.empty()) {
+            auto& e = _impl->handles.front();
+            e.cancel();
+            /*
+             * The handle will unlink itself in cancel(),
+             * so there is no need to pop_front().
+             */
+        }
+
+        // TODO:check and throw errors, move dtor to function
+        go_asio_ipfs_free(_impl->ipfs_handle);
+    }
+}
+
 void node::build_( asio::io_service& ios
                  , config cfg
                  , Cancel* cancel
@@ -346,19 +364,3 @@ boost::asio::io_service& node::get_io_service()
     return _impl->ios;
 }
 
-node::~node()
-{
-    if (_impl) {
-        // Make sure all handlers get completed.
-        while (!_impl->handles.empty()) {
-            auto& e = _impl->handles.front();
-            e.cancel();
-            /*
-             * The handle will unlink itself in cancel(),
-             * so there is no need to pop_front().
-             */
-        }
-
-        go_asio_ipfs_free(_impl->ipfs_handle);
-    }
-}
