@@ -1,4 +1,8 @@
-cmake_minimum_required (VERSION 3.13)
+if ("${CMAKE_SYSTEM_NAME}" STREQUAL "Windows")
+    cmake_minimum_required (VERSION 3.21)
+else ()
+    cmake_minimum_required (VERSION 3.13)
+endif()
 
 project(asio-ipfs)
 include(ExternalProject)
@@ -291,8 +295,8 @@ if (WINDOWS)
     )
 
     # IMPORTED_RUNTIME_ARTIFACTS available only in 3.21
-    # install(IMPORTED_RUNTIME_ARTIFACTS ipfs-bindings RUNTIME DESTINATION .)
-    install(FILES ${BINDINGS_DLL} DESTINATION BIN)
+    install(IMPORTED_RUNTIME_ARTIFACTS ipfs-bindings RUNTIME DESTINATION .)
+    # install(FILES ${BINDINGS_DLL} DESTINATION BIN)
 endif()
 
 if (LINUX OR DARWIN)

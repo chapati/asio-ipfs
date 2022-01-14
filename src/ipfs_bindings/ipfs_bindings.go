@@ -1,7 +1,7 @@
 // Useful links:
 // https://github.com/ipfs/go-ipfs/issues/3060
 // https://github.com/ipfs/examples/tree/master/examples
-
+// TODO:IPFS custom default API port (wallet api cannot run together with ipfs service), disable API by default in UI, enable in WalletAPI
 package main
 
 import (
