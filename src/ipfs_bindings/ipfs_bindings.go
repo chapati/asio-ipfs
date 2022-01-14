@@ -89,6 +89,7 @@ type Config struct {
 	GracePeriod    string    `json:"GracePeriod"`
 	Bootstrap      []string  `json:"Bootstrap"`
 	NodeSwarmPort  int       `json:"NodeSwarmPort"`
+	NodeApiPort    int       `json:"NodeApiPort"`
 }
 
 func main() {
@@ -127,7 +128,7 @@ func updateConfig(conf *config.Config, c *Config) error {
     //
     // Swarm ports
     //
-    var replacePort = func (addr string, proto int, prefix string) (string, error) {
+    var replacePort = func (addr string, proto int, prefix string, newPort int) (string, error) {
         maddr, err := ma.NewMultiaddr(addr)
         if err != nil {
             return "", err
@@ -137,7 +138,7 @@ func updateConfig(conf *config.Config, c *Config) error {
             if comp.Protocol().Code == proto {
                 sport := comp.Value()
                 what := prefix + sport
-                with := prefix + strconv.FormatInt(int64(c.NodeSwarmPort), 10)
+                with := prefix + strconv.FormatInt(int64(newPort), 10)
                 addr = strings.Replace(addr, what, with, -1)
             }
             return true
@@ -147,17 +148,35 @@ func updateConfig(conf *config.Config, c *Config) error {
     }
 
     for idx, addr := range conf.Addresses.Swarm {
-        addr, err := replacePort(addr, ma.P_TCP, "/tcp/")
+        addr, err := replacePort(addr, ma.P_TCP, "/tcp/", c.NodeSwarmPort)
         if err != nil {
             return err
         }
 
-        addr, err = replacePort(addr, ma.P_UDP, "/udp/")
+        addr, err = replacePort(addr, ma.P_UDP, "/udp/", c.NodeSwarmPort)
         if err != nil {
             return err
         }
 
         conf.Addresses.Swarm[idx] = addr
+    }
+
+    //
+    // API ports
+    //
+    if c.NodeApiPort == 0 {
+        // Zero port is passed, it means we do not want to spin up any API
+        conf.Addresses.API = []string{}
+        return fmt.Errorf("NodeApiPort is 0, this is not supported at the moment, TBD")
+    } else {
+        // strictly speaking there should be only 1 address but why not to iterate
+        for idx, addr := range conf.Addresses.API {
+            addr, err := replacePort(addr, ma.P_TCP, "/tcp/", c.NodeApiPort)
+            if err != nil {
+                return err
+            }
+            conf.Addresses.API[idx] = addr
+        }
     }
 
     //
@@ -513,23 +532,27 @@ func start_node(cfg_json string, n *Node, repoRoot string) C.int {
             corehttp.MetricsScrapingOption("/debug/metrics/prometheus"),
             corehttp.LogOption(),
         }
-	    // TODO:IPFS do we need this?
-		apiAddr := cfg.Addresses.API[0]
-		apiMAddr, err := ma.NewMultiaddr(apiAddr)
 
-		if err != nil {
-		    // IPFS:TODO fail / check serveHTTPApi in daemon.go
-        	fmt.Printf("serveHTTPApi: invalid API address: %q (err: %s)", apiAddr, err)
+        // TODO:IPFS check if everything really works if api is not launched
+        if len(cfg.Addresses.API) != 0 {
+            // TODO:IPFS do we need this?
+            apiAddr := cfg.Addresses.API[0]
+            apiMAddr, err := ma.NewMultiaddr(apiAddr)
+
+            if err != nil {
+                // IPFS:TODO fail / check serveHTTPApi in daemon.go
+                fmt.Printf("serveHTTPApi: invalid API address: %q (err: %s)", apiAddr, err)
+            }
+
+            if err = n.node.Repo.SetAPIAddr(apiMAddr); err != nil {
+                fmt.Printf("serveHTTPApi: SetAPIAddr() failed: %s\n", err)
+            }
+
+            err = corehttp.ListenAndServe(n.node, apiAddr, opts... )
+            if err != nil {
+                fmt.Printf("Warning: failed to start API listener on %s\n", apiAddr);
+            }
         }
-
-		if err = n.node.Repo.SetAPIAddr(apiMAddr); err != nil {
-        	fmt.Printf("serveHTTPApi: SetAPIAddr() failed: %s\n", err)
-        }
-
-		err = corehttp.ListenAndServe(n.node, apiAddr, opts... )
-		if err != nil {
-			fmt.Printf("Warning: failed to start API listener on %s\n", apiAddr);
-		}
 	}()
 
 	n.api = api

@@ -12,6 +12,7 @@ namespace asio_ipfs
         unsigned int high_water = 200;
         unsigned int grace_period = 20;
         unsigned int node_swarm_port = 10100;
+        unsigned int node_api_port = 6001;
         std::vector<std::string> bootstrap;
     };
 }

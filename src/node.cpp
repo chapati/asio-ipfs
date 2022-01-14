@@ -197,7 +197,8 @@ static string config_to_json(config cfg)
         {"HighWater",     cfg.high_water},
         {"GracePeriod",   std::to_string(cfg.grace_period) + std::string("s")},
         {"Bootstrap",     cfg.bootstrap},
-        {"NodeSwarmPort", cfg.node_swarm_port}
+        {"NodeSwarmPort", cfg.node_swarm_port},
+        {"NodeApiPort",   cfg.node_api_port}
     };
 
     return json.dump();
@@ -277,7 +278,6 @@ node::node() = default;
 node::node(node&&) = default;
 node& node::operator=(node&&) = default;
 
-
 string node::id() const {
     char* cid = go_asio_ipfs_node_id(_impl->ipfs_handle);
     string ret(cid);
@@ -291,7 +291,6 @@ void node::publish_( const string& cid
                    , std::function<void(sys::error_code)> cb)
 {
     assert(cid.size() == CID_SIZE);
-
     call_ipfs(_impl.get(), cancel, std::move(cb), go_asio_ipfs_publish, (char*) cid.data(), std::chrono::duration_cast<std::chrono::seconds>(d).count());
 }
 
@@ -332,7 +331,6 @@ void node::cat_( string_view cid
                , function<void(sys::error_code, string)> cb)
 {
     assert(cid.size() == CID_SIZE);
-
     call_ipfs(_impl.get(), cancel, std::move(cb), go_asio_ipfs_cat, (char*) cid.data());
 }
 
@@ -341,8 +339,7 @@ void node::pin_( const string& cid
                , std::function<void(sys::error_code)> cb)
 {
     assert(cid.size() == CID_SIZE);
-
-    call_ipfs(_impl.get(), cancel, cb, go_asio_ipfs_pin, (char*) cid.data());
+    call_ipfs(_impl.get(), cancel, std::move(cb), go_asio_ipfs_pin, (char*) cid.data());
 }
 
 void node::unpin_( const string& cid
@@ -350,13 +347,12 @@ void node::unpin_( const string& cid
                  , std::function<void(sys::error_code)> cb)
 {
     assert(cid.size() == CID_SIZE);
-
-    call_ipfs(_impl.get(), cancel, cb, go_asio_ipfs_unpin, (char*) cid.data());
+    call_ipfs(_impl.get(), cancel, std::move(cb), go_asio_ipfs_unpin, (char*) cid.data());
 }
 
 void node::gc_(Cancel* cancel, std::function<void(boost::system::error_code)> cb)
 {
-    call_ipfs(_impl.get(), cancel, cb, go_asio_ipfs_gc);
+    call_ipfs(_impl.get(), cancel, std::move(cb), go_asio_ipfs_gc);
 }
 
 boost::asio::io_service& node::get_io_service()
