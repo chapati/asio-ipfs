@@ -37,7 +37,7 @@ import (
 	"github.com/ipfs/interface-go-ipfs-core/options"
 
 	path "github.com/ipfs/go-path"
-	// peer "github.com/libp2p/go-libp2p-peer" causes deprecate error
+	kenc "github.com/ipfs/go-ipfs/core/commands/keyencode"
 	files "github.com/ipfs/go-ipfs-files"
 
 	mprome "github.com/ipfs/go-metrics-prometheus"
@@ -591,24 +591,15 @@ func go_asio_memfree(what unsafe.Pointer) {
 // IMPORTANT: The returned value needs to be explicitly go_asio_memfree-d
 //export go_asio_ipfs_node_id
 func go_asio_ipfs_node_id(handle uint64) *C.char {
-    //TODO:IPFS
-    /*  uncommenting code below causes
-        key_deprecated.go:68:22: undefined: "github.com/libp2p/go-libp2p-core/crypto".StretchedKeys
-        key_deprecated.go:72:9: undefined: "github.com/libp2p/go-libp2p-core/crypto".KeyStretcher
-        it is not necessary for now
-
-	var n = g_nodes[handle]
-
-	pid, err := peer.IDFromPrivateKey(n.node.PrivateKey)
-
+	n := g_nodes[handle]
+	ke, err := kenc.KeyEncoderFromString("b58mh")
 	if err != nil {
-		return nil
+	    // should never fail, so just panic
+	    panic(err)
 	}
-
-	cstr := C.CString(pid.Pretty())
-	return cstr*/
-	cstr := C.CString("TODO")
-	return cstr
+	id :=  ke.FormatID(n.node.Identity)
+	cstr := C.CString(id)
+    return cstr
 }
 
 //export go_asio_ipfs_resolve

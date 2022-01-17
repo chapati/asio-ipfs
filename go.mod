@@ -1,4 +1,4 @@
-module github.com/equalitie/asio-ipfs
+module github.com/chapati/asio-ipfs
 
 go 1.12
 

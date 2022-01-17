@@ -1,9 +1,6 @@
 // Error codes returned by IPFS glue code
 #pragma once
 
-#ifndef GUARD_ipfs_error_codes_h
-#define GUARD_ipfs_error_codes_h
-
 #define IPFS_SUCCESS                 0
 #define IPFS_FAILED_TO_PARSE_CONFIG  1
 #define IPFS_FAILED_TO_CREATE_REPO   2  // failed to create repository
@@ -17,6 +14,3 @@
 #define IPFS_UNPIN_FAILED           10  // failed to unpin CID
 #define IPFS_GC_FAILED              11  // failed to garbage collect
 #define IPFS_NO_NODE                12  // failed to find a node by handle
-
-
-#endif  // ndef GUARD_ipfs_error_codes_h
