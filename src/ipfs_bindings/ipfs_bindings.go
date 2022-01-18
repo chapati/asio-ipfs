@@ -121,9 +121,15 @@ func configUnlocked(repoRoot string) bool {
 //	"/ip6/tcp/ws",
 //
 func updateConfig(conf *config.Config, c *Config) error {
+    //
+    // Swarm connection manager
+    //
     conf.Swarm.ConnMgr.LowWater = c.LowWater
     conf.Swarm.ConnMgr.HighWater = c.HighWater
     conf.Swarm.ConnMgr.GracePeriod = c.GracePeriod
+
+    // TODO:IPFS adjust autorelay server settings on Bootstrap nodes
+    conf.Swarm.EnableAutoRelay = true
 
     //
     // Swarm ports
@@ -274,6 +280,19 @@ func openOrCreateRepo(repoRoot string, c Config) (repo.Repo, error) {
     }
 
     //
+    // Apply default server profile
+    //
+    // TODO:IPFS may be enable MDNS on desktop nodes?
+    transformer, ok := config.Profiles["server"]
+    if !ok {
+        return nil, fmt.Errorf("Unable to find default server profile.")
+    }
+
+    if err := transformer.Transform(conf); err != nil {
+        return nil, err
+    }
+
+    //
     // And write our config values
     //
     err = updateConfig(conf, &c)
@@ -304,14 +323,33 @@ func printSwarmAddrs(node *core.IpfsNode) {
 		fmt.Println("Swarm not listening, running in offline mode.")
 		return
 	}
+
+    //
+    // Listening addresses
+    //
+    var lisAddrs []string
+    ifaceAddrs, err := node.PeerHost.Network().InterfaceListenAddresses()
+    if err != nil {
+        fmt.Println("failed to read listening addresses:", err)
+    }
+    for _, addr := range ifaceAddrs {
+        lisAddrs = append(lisAddrs, addr.String())
+    }
+    sort.Strings(lisAddrs)
+    for _, addr := range lisAddrs {
+        fmt.Printf("Swarm listening on %s\n", addr)
+    }
+
+	//
+	// Announcing addresses
+	//
 	var addrs []string
 	for _, addr := range node.PeerHost.Addrs() {
 		addrs = append(addrs, addr.String())
 	}
 	sort.Sort(sort.StringSlice(addrs))
-
 	for _, addr := range addrs {
-		fmt.Printf("Swarm listening on %s\n", addr)
+		fmt.Printf("Swarm announcing %s\n", addr)
 	}
 }
 
@@ -485,6 +523,7 @@ func start_node(cfg_json string, n *Node, repoRoot string) C.int {
 
 	elapsed := time.Since(start)
     fmt.Println("IPFS core.NewNode startup time:", elapsed)
+    fmt.Println("Relay: ", cfg.Swarm.Transports.Network.Relay);
 
     // TODO:IPFS do we need this?
 	n.node.IsDaemon = true
