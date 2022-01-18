@@ -1,5 +1,5 @@
 #pragma once
 
-#include <asio_ipfs/node.h>
-#include <asio_ipfs/error.h>
-#include <asio_ipfs/config.h>
+#include "ipfs_node.h"
+#include "ipfs_error.h"
+#include "ipfs_config.h"

@@ -6,7 +6,7 @@ typedef size_t __SIZE_TYPE__;
 #include <libipfs-bindings.h>
 #endif
 
-#include <asio_ipfs/error.h>
+#include <error.h>
 #include <cassert>
 #include <tuple>
 #include <boost/intrusive/list.hpp>

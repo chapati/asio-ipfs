@@ -6,7 +6,7 @@
 #include <boost/asio/steady_timer.hpp>
 #include <boost/asio/io_service.hpp>
 #include <boost/utility/string_view.hpp>
-#include "config.h"
+#include "ipfs_config.h"
 
 namespace asio_ipfs {
 

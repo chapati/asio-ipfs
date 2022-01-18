@@ -2,7 +2,7 @@
 
 #include <string>
 #include <boost/system/error_code.hpp>
-#include <asio_ipfs/ipfs_error_codes.h>
+#include "ipfs_error_codes.h"
 
 namespace asio_ipfs::error {
 

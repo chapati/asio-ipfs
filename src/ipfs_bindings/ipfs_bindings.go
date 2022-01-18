@@ -46,7 +46,7 @@ import (
 //#include <stdlib.h>
 //#include <stddef.h>
 //#include <stdint.h>
-//#include <asio_ipfs/ipfs_error_codes.h>
+//#include <ipfs_error_codes.h>
 //
 //// Don't export these functions into C or we'll get "unused function" warnings
 //// (Or errors saying functions are defined more than once if the're not static).

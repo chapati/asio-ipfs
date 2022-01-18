@@ -1,4 +1,4 @@
-#include <asio_ipfs/error.h>
+#include "ipfs_error.h"
 
 boost::system::error_code
 asio_ipfs::error::make_error_code(::asio_ipfs::error::ipfs_error e)

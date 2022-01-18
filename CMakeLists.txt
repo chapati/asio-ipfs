@@ -166,7 +166,7 @@ if (LINUX)
 
     add_custom_command(
         OUTPUT  ${BINDINGS_OUTPUT}
-        DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/include/asio_ipfs/ipfs_error_codes.h
+        DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/include/ipfs_error_codes.h
                 ${CMAKE_CURRENT_SOURCE_DIR}/src/ipfs_bindings/ipfs_bindings.go
                 golang
 
@@ -202,7 +202,7 @@ elseif (DARWIN)
 
     add_custom_command(
         OUTPUT  ${BINDINGS_OUTPUT}
-        DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/include/asio_ipfs/ipfs_error_codes.h
+        DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/include/ipfs_error_codes.h
                 ${CMAKE_CURRENT_SOURCE_DIR}/src/ipfs_bindings/ipfs_bindings.go
                 golang
 
@@ -239,7 +239,7 @@ elseif(WIN64)
 
     add_custom_command(
         OUTPUT ${BINDINGS_OUTPUT}       
-        DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/include/asio_ipfs/ipfs_error_codes.h
+        DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/include/pfs_error_codes.h
                 ${CMAKE_CURRENT_SOURCE_DIR}/src/ipfs_bindings/ipfs_bindings.go
                 golang tdmgcce
 
@@ -342,7 +342,7 @@ add_dependencies(asio-ipfs
 
 target_include_directories(asio-ipfs
     PRIVATE ${BINDINGS_DIR}
-    PUBLIC "include"
+    PRIVAte "${CMAKE_CURRENT_SOURCE_DIR}/include"
 )
 
 target_link_libraries(asio-ipfs
