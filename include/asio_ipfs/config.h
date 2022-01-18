@@ -15,6 +15,7 @@ namespace asio_ipfs
             if (mode == Mode::Server) {
                 auto_relay = false;
                 default_profile = "server";
+                storage_max = "20GB";
             }
         }
 
@@ -22,8 +23,9 @@ namespace asio_ipfs
         // N.B. Defaults below are optimal for running IPFS on desktop
         //
         bool online = true;
-        std::string  repo_root = "./ipfs-repo";
-        std::string  default_profile;
+        std::string repo_root = "./ipfs-repo";
+        std::string default_profile;
+        std::string storage_max = "2GB";
         unsigned int low_water = 100;
         unsigned int high_water = 200;
         unsigned int grace_period = 20;
@@ -34,4 +36,3 @@ namespace asio_ipfs
         bool relay_hop = false;
     };
 }
-

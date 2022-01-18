@@ -202,6 +202,7 @@ static string config_to_json(config cfg)
         {"DefaultProfile", cfg.default_profile},
         {"AutoRelay",      cfg.auto_relay},
         {"RelayHop",       cfg.relay_hop},
+        {"StorageMax",     cfg.storage_max}
     };
 
     return json.dump();

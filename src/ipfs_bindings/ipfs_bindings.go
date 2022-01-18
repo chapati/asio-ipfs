@@ -1,11 +1,8 @@
-// Useful links:
-// https://github.com/ipfs/go-ipfs/issues/3060
-// https://github.com/ipfs/examples/tree/master/examples
-// TODO:IPFS custom default API port (wallet api cannot run together with ipfs service), disable API by default in UI, enable in WalletAPI
 package main
 
 import (
 	"fmt"
+	"log"
 	"context"
 	"os"
 	"errors"
@@ -93,6 +90,7 @@ type Config struct {
 	NodeSwarmPort  int       `json:"NodeSwarmPort"`
 	NodeApiPort    int       `json:"NodeApiPort"`
 	DefaultProfile string    `json:"DefaultProfile"`
+	StorageMax     string    `json:"StorageMax"`
 }
 
 func main() {
@@ -111,18 +109,6 @@ func configUnlocked(repoRoot string) bool {
     return false
 }
 
-// TODO:IPFS
-// SupportedTransportStrings is the list of supported transports for the swarm.
-// These are strings of encapsulated multiaddr protocols. E.g.:
-//   /ip4/tcp
-//var SupportedTransportStrings = []string{
-//	"/ip4/tcp",
-//	"/ip6/tcp",
-//	"/ip4/udp/utp",
-//	"/ip6/udp/utp",
-//	"/ip4/tcp/ws",
-//	"/ip6/tcp/ws",
-//
 func updateConfig(conf *config.Config, c *Config) error {
     //
     // Swarm connection manager
@@ -136,6 +122,7 @@ func updateConfig(conf *config.Config, c *Config) error {
     conf.Swarm.EnableAutoRelay = c.AutoRelay
     conf.Swarm.EnableRelayHop = c.RelayHop
     conf.Swarm.DisableRelay = false
+    conf.Datastore.StorageMax = c.StorageMax
 
     //
     // Swarm ports
@@ -195,7 +182,7 @@ func updateConfig(conf *config.Config, c *Config) error {
     // Bootstrap peers
     //
     if len (c.Bootstrap) == 0 {
-        fmt.Println("WARNING: empty bootstrap peers in config. Default IPFS bootstrap peers would be used.")
+        log.Println("WARNING: empty bootstrap peers in config. Default IPFS bootstrap peers would be used.")
     } else {
         ps, err :=  config.ParseBootstrapPeers(c.Bootstrap)
         if err != nil {
@@ -211,7 +198,6 @@ func updateRepo(repoRoot string) error {
     //
     // Manually add swarm key
     // We're forcing private repository mode
-    // TODO:IPFS make configurable
     // N.B. If decide to switch to a public network need to update QUIC settings & ports
     //
     spath := formRepoPath(repoRoot, "swarm.key")
@@ -257,7 +243,7 @@ func openOrCreateRepo(repoRoot string, c Config) (repo.Repo, error) {
         locked := !configUnlocked(repoRoot)
 
         if locked {
-            fmt.Printf("WARNING: IPFS config is locked via %s. Config would be read from repository.\n", configLock)
+            log.Printf("WARNING: IPFS config is locked via %s. Config would be read from repository.\n", configLock)
             return repo, nil
         }
 
@@ -287,10 +273,8 @@ func openOrCreateRepo(repoRoot string, c Config) (repo.Repo, error) {
     //
     // Apply default profile if any
     //
-    // TODO:IPFS may be enable MDNS on desktop nodes?
     if c.DefaultProfile != "" {
-        // TODO:IPFS switch to log.
-        fmt.Printf("Applying %s IPFS profile", c.DefaultProfile)
+        log.Printf("Applying %s IPFS profile", c.DefaultProfile)
         transformer, ok := config.Profiles[c.DefaultProfile]
         if !ok {
             return nil, fmt.Errorf("Unable to find default server profile.")
@@ -329,7 +313,7 @@ func openOrCreateRepo(repoRoot string, c Config) (repo.Repo, error) {
 
 func printSwarmAddrs(node *core.IpfsNode) {
 	if !node.IsOnline {
-		fmt.Println("Swarm not listening, running in offline mode.")
+		log.Println("Swarm listening disabled, running in offline mode.")
 		return
 	}
 
@@ -339,14 +323,16 @@ func printSwarmAddrs(node *core.IpfsNode) {
     var lisAddrs []string
     ifaceAddrs, err := node.PeerHost.Network().InterfaceListenAddresses()
     if err != nil {
-        fmt.Println("failed to read listening addresses:", err)
+        log.Println("WARNING: failed to read listening addresses:", err)
     }
+
     for _, addr := range ifaceAddrs {
         lisAddrs = append(lisAddrs, addr.String())
     }
+
     sort.Strings(lisAddrs)
     for _, addr := range lisAddrs {
-        fmt.Printf("Swarm listening on %s\n", addr)
+        log.Printf("Swarm listening on %s\n", addr)
     }
 
 	//
@@ -358,7 +344,7 @@ func printSwarmAddrs(node *core.IpfsNode) {
 	}
 	sort.Sort(sort.StringSlice(addrs))
 	for _, addr := range addrs {
-		fmt.Printf("Swarm announcing %s\n", addr)
+		log.Printf("Swarm announcing %s\n", addr)
 	}
 }
 
@@ -473,24 +459,24 @@ func start_node(cfg_json string, n *Node, repoRoot string) C.int {
 	err := json.Unmarshal([]byte(cfg_json), &c)
 
 	if err != nil {
-		fmt.Println("Failed to parse config ", err);
+		log.Println("Failed to parse config", err);
 		return C.IPFS_FAILED_TO_PARSE_CONFIG
 	}
 
     if !g_injected {
 	    err = mprome.Inject()
 	    if err != nil {
-		    fmt.Println("mprome err", err)
+		    log.Println("mprome err", err)
 		    return C.IPFS_FAILED_TO_CREATE_REPO // TODO:IPFS FIXME
 	    }
-	     g_injected = true
+	    g_injected = true
 	}
 
 	// TODO:IPFS check how plugins are started in https://github.com/ipfs/go-ipfs/blob/029d82c4ea9d73f485b30e5f5100c86502308375/cmd/ipfs/daemon.go
 	if !g_flatfsPlugins {
         g_flatfsPlugins = loadPlugins(flatfs.Plugins)
         if !g_flatfsPlugins {
-            fmt.Println("Failed to load flatfs plugins")
+            log.Println("Failed to load flatfs plugins")
             return C.IPFS_FAILED_TO_CREATE_REPO
         }
     }
@@ -498,20 +484,20 @@ func start_node(cfg_json string, n *Node, repoRoot string) C.int {
     if !g_leveldsPlugins {
         g_leveldsPlugins = loadPlugins(levelds.Plugins)
         if !g_leveldsPlugins {
-            fmt.Println("Failed to load levelds plugins")
+            log.Println("Failed to load levelds plugins")
             return C.IPFS_FAILED_TO_CREATE_REPO
         }
     }
 
 	r, err := openOrCreateRepo(repoRoot, c);
 	if err != nil {
-		fmt.Println("err", err);
+		log.Println("err", err);
 		return C.IPFS_FAILED_TO_CREATE_REPO
 	}
 
 	cfg, err := r.Config()
 	if err != nil {
-	    fmt.Println("err", err);
+	    log.Println("Unable to get repo config", err);
         return C.IPFS_FAILED_TO_CREATE_REPO
 	}
 
@@ -526,13 +512,12 @@ func start_node(cfg_json string, n *Node, repoRoot string) C.int {
    })
 
    if err != nil {
-       fmt.Println("err", err);
+       log.Println("Unable to create node", err);
        return C.IPFS_FAILED_TO_START_NODE
    }
 
 	elapsed := time.Since(start)
-    fmt.Println("IPFS core.NewNode startup time:", elapsed)
-    fmt.Println("Relay: ", cfg.Swarm.Transports.Network.Relay);
+    log.Println("IPFS core.NewNode startup time", elapsed, ", relay mode", cfg.Swarm.Transports.Network.Relay)
 
     // TODO:IPFS do we need this?
 	n.node.IsDaemon = true
@@ -543,23 +528,23 @@ func start_node(cfg_json string, n *Node, repoRoot string) C.int {
 
 	api, err := coreapi.NewCoreAPI(n.node)
 	if err != nil {
-		fmt.Println("err", err);
+		log.Println("Unable to create core API", err);
 		return C.IPFS_FAILED_TO_CREATE_REPO
 	}
 
 	// Print peers
 	peers, err := api.Swarm().Peers(n.node.Context())
 	if err != nil {
-        fmt.Println("failed to read swarm peers:", err)
+        log.Println("Failed to read swarm peers:", err)
         return C.IPFS_FAILED_TO_START_NODE
     }
 
     // TODO:IPFS print this every several minutes
     if len(peers) == 0 {
-        fmt.Println("WARNING: IPFS was unable to connect to peers")
+        log.Println("WARNING: IPFS was unable to connect to peers")
     } else {
         for _, peer := range peers {
-            fmt.Printf("IPFS Peer %v %v\n", peer.ID().Pretty(), peer.Address().String())
+            log.Printf("IPFS Peer %v %v\n", peer.ID().Pretty(), peer.Address().String())
         }
     }
 
@@ -589,16 +574,16 @@ func start_node(cfg_json string, n *Node, repoRoot string) C.int {
 
             if err != nil {
                 // IPFS:TODO fail / check serveHTTPApi in daemon.go
-                fmt.Printf("serveHTTPApi: invalid API address: %q (err: %s)", apiAddr, err)
+                log.Printf("serveHTTPApi: invalid API address: %q (err: %s)", apiAddr, err)
             }
 
             if err = n.node.Repo.SetAPIAddr(apiMAddr); err != nil {
-                fmt.Printf("serveHTTPApi: SetAPIAddr() failed: %s\n", err)
+                log.Printf("serveHTTPApi: SetAPIAddr() failed: %s\n", err)
             }
 
             err = corehttp.ListenAndServe(n.node, apiAddr, opts... )
             if err != nil {
-                fmt.Printf("Warning: failed to start API listener on %s\n", apiAddr);
+                log.Printf("Warning: failed to start API listener on %s\n", apiAddr);
             }
         }
 	}()
@@ -688,7 +673,7 @@ func publish(ctx context.Context, duration time.Duration, n *core.IpfsNode, cid 
 	path, err := path.ParseCidToPath(cid)
 
 	if err != nil {
-		fmt.Println("go_asio_ipfs_publish failed to parse cid \"", cid, "\"");
+		log.Println("go_asio_ipfs_publish failed to parse cid \"", cid, "\"");
 		return err
 	}
 
@@ -698,7 +683,7 @@ func publish(ctx context.Context, duration time.Duration, n *core.IpfsNode, cid 
 	err  = n.Namesys.PublishWithEOL(ctx, k, path, eol)
 
 	if err != nil {
-		fmt.Println("go_asio_ipfs_publish failed");
+		log.Println("go_asio_ipfs_publish failed");
 		return err
 	}
 
@@ -715,8 +700,8 @@ func go_asio_ipfs_publish(handle uint64, cancel_signal C.uint64_t, cid *C.char, 
 
 	go func() {
 		if debug {
-			fmt.Println("go_asio_ipfs_publish start");
-			defer fmt.Println("go_asio_ipfs_publish end");
+			log.Println("go_asio_ipfs_publish start");
+			defer log.Println("go_asio_ipfs_publish end");
 		}
 
 		// https://stackoverflow.com/questions/17573190/how-to-multiply-duration-by-integer
@@ -739,14 +724,14 @@ func go_asio_ipfs_add(handle uint64, data unsafe.Pointer, size C.size_t, only_ha
 
 	go func() {
 		if debug {
-			fmt.Println("go_asio_ipfs_add start");
-			defer fmt.Println("go_asio_ipfs_add end");
+			log.Println("go_asio_ipfs_add start");
+			defer log.Println("go_asio_ipfs_add end");
 		}
 
 		p, err := n.api.Unixfs().Add(n.node.Context(), files.NewBytesFile(msg), options.Unixfs.HashOnly(only_hash))
 
 		if err != nil {
-			fmt.Println("Error: failed to insert content ", err)
+			log.Println("Error: failed to insert content ", err)
 			C.execute_data_cb(fn, C.IPFS_ADD_FAILED, nil, C.size_t(0), fn_arg)
 			return;
 		}
@@ -754,7 +739,7 @@ func go_asio_ipfs_add(handle uint64, data unsafe.Pointer, size C.size_t, only_ha
 		cid := p.Root()
 
 		if err != nil {
-			fmt.Println("Error: failed to parse IPFS path ", err)
+			log.Println("Error: failed to parse IPFS path ", err)
 			C.execute_data_cb(fn, C.IPFS_ADD_FAILED, nil, C.size_t(0), fn_arg)
 			return;
 		}
@@ -777,15 +762,15 @@ func go_asio_ipfs_cat(handle uint64, cancel_signal C.uint64_t, c_cid *C.char, fn
 
 	go func() {
 		if debug {
-			fmt.Println("go_asio_ipfs_cat start");
-			defer fmt.Println("go_asio_ipfs_cat end");
+			log.Println("go_asio_ipfs_cat start");
+			defer log.Println("go_asio_ipfs_cat end");
 		}
 
 		path := corepath.New(cid)
 		f, err := n.api.Unixfs().Get(cancel_ctx, path)
 
 		if err != nil {
-			fmt.Printf("go_asio_ipfs_cat failed to Cat %q\n", err);
+			log.Printf("go_asio_ipfs_cat failed to Cat %q\n", err);
 			C.execute_data_cb(fn, C.IPFS_CAT_FAILED, nil, C.size_t(0), fn_arg)
 			return
 		}
@@ -796,11 +781,11 @@ func go_asio_ipfs_cat(handle uint64, cancel_signal C.uint64_t, c_cid *C.char, fn
 		case files.File:
 			file = f
 		case files.Directory:
-			fmt.Printf("go_asio_ipfs_cat path corresponds to a directory\n");
+			log.Printf("go_asio_ipfs_cat path corresponds to a directory\n");
 			C.execute_data_cb(fn, C.IPFS_CAT_FAILED, nil, C.size_t(0), fn_arg)
 			return
 		default:
-			fmt.Printf("go_asio_ipfs_cat unsupported type\n");
+			log.Printf("go_asio_ipfs_cat unsupported type\n");
 			C.execute_data_cb(fn, C.IPFS_CAT_FAILED, nil, C.size_t(0), fn_arg)
 			return
 		}
@@ -809,7 +794,7 @@ func go_asio_ipfs_cat(handle uint64, cancel_signal C.uint64_t, c_cid *C.char, fn
 		bytes, err := ioutil.ReadAll(r)
 
 		if err != nil {
-			fmt.Println("go_asio_ipfs_cat failed to read");
+			log.Println("go_asio_ipfs_cat failed to read");
 			C.execute_data_cb(fn, C.IPFS_READ_FAILED, nil, C.size_t(0), fn_arg)
 			return
 		}
@@ -831,15 +816,15 @@ func go_asio_ipfs_pin(handle uint64, cancel_signal C.uint64_t, c_cid *C.char, fn
 
 	go func() {
 		if debug {
-			fmt.Println("go_asio_ipfs_pin start");
-			defer fmt.Println("go_asio_ipfs_pin end");
+			log.Println("go_asio_ipfs_pin start");
+			defer log.Println("go_asio_ipfs_pin end");
 		}
 
 		path := corepath.New(cid)
 		err := n.api.Pin().Add(cancel_ctx, path)
 
 		if err != nil {
-			fmt.Printf("go_asio_ipfs_pin failed to pin %q %q\n", cid, err)
+			log.Printf("go_asio_ipfs_pin failed to pin %q %q\n", cid, err)
 			C.execute_void_cb(fn, C.IPFS_PIN_FAILED, fn_arg)
 			return
 		}
@@ -858,15 +843,15 @@ func go_asio_ipfs_unpin(handle uint64, cancel_signal C.uint64_t, c_cid *C.char, 
 
 	go func() {
 		if debug {
-			fmt.Println("go_asio_ipfs_unpin start");
-			defer fmt.Println("go_asio_ipfs_unpin end");
+			log.Println("go_asio_ipfs_unpin start");
+			defer log.Println("go_asio_ipfs_unpin end");
 		}
 
 		path := corepath.New(cid)
 		err := n.api.Pin().Rm(cancel_ctx, path)
 
 		if err != nil {
-			fmt.Printf("go_asio_ipfs_unpin failed to unpin %q %q\n", cid, err);
+			log.Printf("go_asio_ipfs_unpin failed to unpin %q %q\n", cid, err);
 			C.execute_void_cb(fn, C.IPFS_UNPIN_FAILED, fn_arg)
 			return
 		}
@@ -885,7 +870,7 @@ func go_asio_ipfs_gc(handle uint64, cancel_signal C.uint64_t, fn unsafe.Pointer,
         err := corerepo.CollectResult(cancel_ctx, gcOutChan, func(k cid.Cid) {})
 
         if err != nil {
-            fmt.Printf("go_asio_ipfs_gc failed %q\n", err);
+            log.Printf("go_asio_ipfs_gc failed %q\n", err);
             C.execute_void_cb(fn, C.IPFS_GC_FAILED, fn_arg)
             return
         }
