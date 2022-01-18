@@ -87,9 +87,12 @@ type Config struct {
 	LowWater       int       `json:"LowWater"`
 	HighWater      int       `json:"HighWater"`
 	GracePeriod    string    `json:"GracePeriod"`
+	AutoRelay      bool      `json:"AutoRelay"`
+	RelayHop       bool      `json:"RelayHop"`
 	Bootstrap      []string  `json:"Bootstrap"`
 	NodeSwarmPort  int       `json:"NodeSwarmPort"`
 	NodeApiPort    int       `json:"NodeApiPort"`
+	DefaultProfile string    `json:"DefaultProfile"`
 }
 
 func main() {
@@ -128,8 +131,11 @@ func updateConfig(conf *config.Config, c *Config) error {
     conf.Swarm.ConnMgr.HighWater = c.HighWater
     conf.Swarm.ConnMgr.GracePeriod = c.GracePeriod
 
+    // TODO:IPFS increase AutoNAT limit
     // TODO:IPFS adjust autorelay server settings on Bootstrap nodes
-    conf.Swarm.EnableAutoRelay = true
+    conf.Swarm.EnableAutoRelay = c.AutoRelay
+    conf.Swarm.EnableRelayHop = c.RelayHop
+    conf.Swarm.DisableRelay = false
 
     //
     // Swarm ports
@@ -230,7 +236,6 @@ func openOrCreateRepo(repoRoot string, c Config) (repo.Repo, error) {
         // We ensure that config passed from outside
         // is written into the IPFS repository
         //
-        // TODO:IPFS add overwrite option. Allow in UI, disable for CLI?
         repo, err := fsrepo.Open(repoRoot)
         if err != nil {
             return nil, err
@@ -280,16 +285,20 @@ func openOrCreateRepo(repoRoot string, c Config) (repo.Repo, error) {
     }
 
     //
-    // Apply default server profile
+    // Apply default profile if any
     //
     // TODO:IPFS may be enable MDNS on desktop nodes?
-    transformer, ok := config.Profiles["server"]
-    if !ok {
-        return nil, fmt.Errorf("Unable to find default server profile.")
-    }
+    if c.DefaultProfile != "" {
+        // TODO:IPFS switch to log.
+        fmt.Printf("Applying %s IPFS profile", c.DefaultProfile)
+        transformer, ok := config.Profiles[c.DefaultProfile]
+        if !ok {
+            return nil, fmt.Errorf("Unable to find default server profile.")
+        }
 
-    if err := transformer.Transform(conf); err != nil {
-        return nil, err
+        if err := transformer.Transform(conf); err != nil {
+            return nil, err
+        }
     }
 
     //
