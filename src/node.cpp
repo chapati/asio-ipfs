@@ -6,12 +6,10 @@ typedef size_t __SIZE_TYPE__;
 #include <libipfs-bindings.h>
 #endif
 
-#include <error.h>
 #include <cassert>
 #include <tuple>
 #include <boost/intrusive/list.hpp>
 #include <boost/optional.hpp>
-#include <sstream>
 #include <nlohmann/json.hpp>
 #include <asio_ipfs.h>
 #include <iostream>
