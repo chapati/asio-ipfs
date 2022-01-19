@@ -166,7 +166,6 @@ func updateConfig(conf *config.Config, c *Config) error {
     if c.NodeApiPort == 0 {
         // Zero port is passed, it means we do not want to spin up any API
         conf.Addresses.API = []string{}
-        return fmt.Errorf("NodeApiPort is 0, this is not supported at the moment, TBD")
     } else {
         // strictly speaking there should be only 1 address but why not to iterate
         for idx, addr := range conf.Addresses.API {
@@ -517,7 +516,8 @@ func start_node(cfg_json string, n *Node, repoRoot string) C.int {
    }
 
 	elapsed := time.Since(start)
-    log.Println("IPFS core.NewNode startup time", elapsed, ", relay mode", cfg.Swarm.Transports.Network.Relay)
+	// TODO:IPFS check why relay mode is default here
+    log.Printf("IPFS core.NewNode startup time %v, relay mode is %v", elapsed, cfg.Swarm.Transports.Network.Relay)
 
     // TODO:IPFS do we need this?
 	n.node.IsDaemon = true
@@ -548,26 +548,25 @@ func start_node(cfg_json string, n *Node, repoRoot string) C.int {
         }
     }
 
-	go func() {
-	    cctx := oldcmds.Context {
-	        ConfigRoot: repoRoot,
-	        ReqLog: &oldcmds.ReqLog{},
-	        ConstructNode: func() (*core.IpfsNode, error) {
-                return n.node, nil
-            },
-            // TODO:IPFS https://github.com/ipfs/go-ipfs/blob/ef866a1400b3b2861e5e8b6cc9edc8633b890a0a/cmd/ipfs/main.go
-            // LoadConfig
-            // Plugins:
-	    }
+    if len(cfg.Addresses.API) != 0 {
+        go func() {
+            cctx := oldcmds.Context {
+                ConfigRoot: repoRoot,
+                ReqLog: &oldcmds.ReqLog{},
+                ConstructNode: func() (*core.IpfsNode, error) {
+                    return n.node, nil
+                },
+                // TODO:IPFS https://github.com/ipfs/go-ipfs/blob/ef866a1400b3b2861e5e8b6cc9edc8633b890a0a/cmd/ipfs/main.go
+                // LoadConfig
+                // Plugins:
+            }
 
-        opts := []corehttp.ServeOption{
-            corehttp.CommandsOption(cctx),
-            corehttp.MetricsScrapingOption("/debug/metrics/prometheus"),
-            corehttp.LogOption(),
-        }
+            opts := []corehttp.ServeOption{
+                corehttp.CommandsOption(cctx),
+                corehttp.MetricsScrapingOption("/debug/metrics/prometheus"),
+                corehttp.LogOption(),
+            }
 
-        // TODO:IPFS check if everything really works if api is not launched
-        if len(cfg.Addresses.API) != 0 {
             // TODO:IPFS do we need this?
             apiAddr := cfg.Addresses.API[0]
             apiMAddr, err := ma.NewMultiaddr(apiAddr)
@@ -585,8 +584,10 @@ func start_node(cfg_json string, n *Node, repoRoot string) C.int {
             if err != nil {
                 log.Printf("Warning: failed to start API listener on %s\n", apiAddr);
             }
-        }
-	}()
+        }()
+    } else {
+        log.Println("IPFS node API port is 0, Node API would is not started.")
+    }
 
 	n.api = api
 	return C.IPFS_SUCCESS
