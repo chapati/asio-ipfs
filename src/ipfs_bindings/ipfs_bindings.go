@@ -177,7 +177,8 @@ func updateConfig(conf *config.Config, c *Config) error {
     //
     if c.NodeApiPort == 0 {
         // Zero port is passed, it means we do not want to spin up any API
-        conf.Addresses.API = []string{}
+        // Pass slice, otherwise it is marshalled to json as `:null` and casue crash on read
+        conf.Addresses.API = make([]string, 0)
     } else {
         // strictly speaking there should be only 1 address but why not to iterate
         for idx, addr := range conf.Addresses.API {
@@ -305,11 +306,8 @@ func openOrCreateRepo(repoRoot string, c Config) (repo.Repo, error) {
     }
 
     // TODO:IPFS /dnsaddr/
-    // TODO:IPFS change to default ports
-    // TODO:IPFS api server & web ui?
+    // TODO:IPFS web ui for Wallet API?
     // TODO:IPFS why pins are not shown in web UI?
-    // TODO:IPFS ensure we're not on a public network, what is indirect pin?
-    // TODO:IPFS & setenforce
     if err = fsrepo.Init(repoRoot, conf); err != nil {
         return nil, err
     }
@@ -471,14 +469,14 @@ func start_node(cfg_json string, n *Node, repoRoot string) C.int {
 
 	if err != nil {
 		log.Println("Failed to parse config", err);
-		return C.IPFS_FAILED_TO_PARSE_CONFIG
+		return C.IPFS_PARSE_CONFIG_FAIL
 	}
 
     if !g_injected {
 	    err = mprome.Inject()
 	    if err != nil {
 		    log.Println("mprome err", err)
-		    return C.IPFS_FAILED_TO_CREATE_REPO // TODO:IPFS FIXME
+		    return C.IPFS_MPROME_INJECT_FAILED
 	    }
 	    g_injected = true
 	}
@@ -488,7 +486,7 @@ func start_node(cfg_json string, n *Node, repoRoot string) C.int {
         g_flatfsPlugins = loadPlugins(flatfs.Plugins)
         if !g_flatfsPlugins {
             log.Println("Failed to load flatfs plugins")
-            return C.IPFS_FAILED_TO_CREATE_REPO
+            return C.IPFS_FLATFS_FAILED
         }
     }
 
@@ -496,20 +494,20 @@ func start_node(cfg_json string, n *Node, repoRoot string) C.int {
         g_leveldsPlugins = loadPlugins(levelds.Plugins)
         if !g_leveldsPlugins {
             log.Println("Failed to load levelds plugins")
-            return C.IPFS_FAILED_TO_CREATE_REPO
+            return C.IPFS_LEVELDS_FAILED
         }
     }
 
 	r, err := openOrCreateRepo(repoRoot, c);
 	if err != nil {
 		log.Println("err", err);
-		return C.IPFS_FAILED_TO_CREATE_REPO
+		return C.IPFS_CREATE_REPO_FAILED
 	}
 
 	cfg, err := r.Config()
 	if err != nil {
 	    log.Println("Unable to get repo config", err);
-        return C.IPFS_FAILED_TO_CREATE_REPO
+        return C.IPFS_READ_CONFIG_FAILED
 	}
 
     start := time.Now()
@@ -524,7 +522,7 @@ func start_node(cfg_json string, n *Node, repoRoot string) C.int {
 
    if err != nil {
        log.Println("Unable to create node", err);
-       return C.IPFS_FAILED_TO_START_NODE
+       return C.IPFS_START_NODE_FAILED
    }
 
 	elapsed := time.Since(start)
@@ -532,6 +530,14 @@ func start_node(cfg_json string, n *Node, repoRoot string) C.int {
 
     // TODO:IPFS do we need this?
 	n.node.IsDaemon = true
+
+	if n.node.PNetFingerprint != nil {
+        log.Println("Swarm is limited to private network of peers with the swarm key")
+        log.Printf("Swarm key fingerprint: %x\n", n.node.PNetFingerprint)
+    } else {
+        log.Println("Swarm is in a public network.")
+    }
+
 	printSwarmAddrs(n.node)
 
     n.collector = &corehttp.IpfsNodeCollector{Node: n.node}
@@ -540,14 +546,14 @@ func start_node(cfg_json string, n *Node, repoRoot string) C.int {
 	api, err := coreapi.NewCoreAPI(n.node)
 	if err != nil {
 		log.Println("Unable to create core API", err);
-		return C.IPFS_FAILED_TO_CREATE_REPO
+		return C.IPFS_CREATE_API_FAILED
 	}
 
 	// Print peers
 	peers, err := api.Swarm().Peers(n.node.Context())
 	if err != nil {
         log.Println("Failed to read swarm peers:", err)
-        return C.IPFS_FAILED_TO_START_NODE
+        return C.IPFS_READ_PEERS_FAILED
     }
 
     // TODO:IPFS print this every several minutes
@@ -578,7 +584,6 @@ func start_node(cfg_json string, n *Node, repoRoot string) C.int {
                 corehttp.LogOption(),
             }
 
-            // TODO:IPFS do we need this?
             apiAddr := cfg.Addresses.API[0]
             apiMAddr, err := ma.NewMultiaddr(apiAddr)
 

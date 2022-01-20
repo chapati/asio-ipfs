@@ -2,15 +2,21 @@
 #pragma once
 
 #define IPFS_SUCCESS                 0
-#define IPFS_FAILED_TO_PARSE_CONFIG  1
-#define IPFS_FAILED_TO_CREATE_REPO   2  // failed to create repository
-#define IPFS_FAILED_TO_START_NODE    3  // failed to start node
-#define IPFS_RESOLVE_FAILED          4  // failed to resolve IPNS entry
-#define IPFS_ADD_FAILED              5  // failed to add data
-#define IPFS_CAT_FAILED              6  // failed to get data reader
-#define IPFS_READ_FAILED             7  // failed to read data
-#define IPFS_PUBLISH_FAILED          8  // failed to publish CID
-#define IPFS_PIN_FAILED              9  // failed to publish CID
-#define IPFS_UNPIN_FAILED           10  // failed to unpin CID
-#define IPFS_GC_FAILED              11  // failed to garbage collect
-#define IPFS_NO_NODE                12  // failed to find a node by handle
+#define IPFS_PARSE_CONFIG_FAIL       1
+#define IPFS_READ_CONFIG_FAILED      2  // failed to read config from IPFS repo
+#define IPFS_CREATE_REPO_FAILED      3
+#define IPFS_CREATE_API_FAILED       4
+#define IPFS_START_NODE_FAILED       5
+#define IPFS_READ_PEERS_FAILED       6
+#define IPFS_MPROME_INJECT_FAILED    7
+#define IPFS_FLATFS_FAILED           8  // flatfs plugin failed
+#define IPFS_LEVELDS_FAILED          9  // levelds plugin failed
+#define IPFS_NO_NODE                 10  // failed to find a node by handle
+#define IPFS_RESOLVE_FAILED          11
+#define IPFS_ADD_FAILED              12
+#define IPFS_CAT_FAILED              13
+#define IPFS_READ_FAILED             14
+#define IPFS_PUBLISH_FAILED          15
+#define IPFS_PIN_FAILED              16
+#define IPFS_UNPIN_FAILED            17
+#define IPFS_GC_FAILED               18

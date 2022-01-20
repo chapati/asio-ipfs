@@ -29,14 +29,28 @@ namespace asio_ipfs::error {
             switch (e) {
                 case IPFS_SUCCESS:
                     return "success";
+                case IPFS_PARSE_CONFIG_FAIL:
+                    return "failed to parse IPFS config";
+                case IPFS_READ_CONFIG_FAILED:
+                    return "failed to read config from IPFS respo";
+                case IPFS_CREATE_REPO_FAILED:
+                    return "failed to create IPFS repository";
+                case IPFS_CREATE_API_FAILED:
+                    return "failed to create core API";
+                case IPFS_START_NODE_FAILED:
+                    return "failed to start IPFS node";
+                case IPFS_READ_PEERS_FAILED:
+                    return "failed to read peers list";
+                case IPFS_MPROME_INJECT_FAILED:
+                    return "failed to inject mprome";
+                case IPFS_FLATFS_FAILED:
+                    return "failt to launch flatfs plugin";
+                case IPFS_LEVELDS_FAILED:
+                    return "failt to launch lefelds plugin";
+                case IPFS_NO_NODE:
+                    return "failed to find a node";
                 case IPFS_RESOLVE_FAILED:
                     return "failed to resolve IPNS entry";
-                case IPFS_FAILED_TO_START_NODE:
-                    return "failed to start IPFS node";
-                case IPFS_FAILED_TO_PARSE_CONFIG:
-                    return "failed to parse IPFS config";
-                case IPFS_FAILED_TO_CREATE_REPO:
-                    return "failed to create IPFS repository";
                 case IPFS_ADD_FAILED:
                     return "failed to add data";
                 case IPFS_CAT_FAILED:
@@ -49,8 +63,8 @@ namespace asio_ipfs::error {
                     return "failed to pin";
                 case IPFS_UNPIN_FAILED:
                     return "failed to unpin";
-                case IPFS_NO_NODE:
-                    return "failed to find a node";
+                case IPFS_GC_FAILED:
+                    return "failed to garbage collect";
                 default:
                     return "unknown ipfs error";
             }
