@@ -80,17 +80,20 @@ const (
 )
 
 type Config struct {
-	Online         bool      `json:"Online"`
-	LowWater       int       `json:"LowWater"`
-	HighWater      int       `json:"HighWater"`
-	GracePeriod    string    `json:"GracePeriod"`
-	AutoRelay      bool      `json:"AutoRelay"`
-	RelayHop       bool      `json:"RelayHop"`
-	Bootstrap      []string  `json:"Bootstrap"`
-	NodeSwarmPort  int       `json:"NodeSwarmPort"`
-	NodeApiPort    int       `json:"NodeApiPort"`
-	DefaultProfile string    `json:"DefaultProfile"`
-	StorageMax     string    `json:"StorageMax"`
+	Online            bool      `json:"Online"`
+	LowWater          int       `json:"LowWater"`
+	HighWater         int       `json:"HighWater"`
+	GracePeriod       string    `json:"GracePeriod"`
+	AutoRelay         bool      `json:"AutoRelay"`
+	RelayHop          bool      `json:"RelayHop"`
+	Bootstrap         []string  `json:"Bootstrap"`
+	NodeSwarmPort     int       `json:"NodeSwarmPort"`
+	NodeApiPort       int       `json:"NodeApiPort"`
+	DefaultProfile    string    `json:"DefaultProfile"`
+	StorageMax        string    `json:"StorageMax"`
+	AutoNAT           bool      `json:"AutoNAT"`
+	AutoNATLimit      int       `json:"AutoNATLimit"`
+	AutoNATPeerLimit  int       `json:"AutoNATPeerLimit"`
 }
 
 func main() {
@@ -117,12 +120,21 @@ func updateConfig(conf *config.Config, c *Config) error {
     conf.Swarm.ConnMgr.HighWater = c.HighWater
     conf.Swarm.ConnMgr.GracePeriod = c.GracePeriod
 
-    // TODO:IPFS increase AutoNAT limit
-    // TODO:IPFS adjust autorelay server settings on Bootstrap nodes
     conf.Swarm.EnableAutoRelay = c.AutoRelay
     conf.Swarm.EnableRelayHop = c.RelayHop
-    conf.Swarm.DisableRelay = false
+    conf.Swarm.Transports.Network.Relay = config.True
     conf.Datastore.StorageMax = c.StorageMax
+
+    if (c.AutoNAT) {
+        conf.AutoNAT.ServiceMode = config.AutoNATServiceEnabled
+    } else {
+        conf.AutoNAT.ServiceMode = config.AutoNATServiceDisabled
+    }
+
+    conf.AutoNAT.Throttle = &config.AutoNATThrottleConfig {
+        GlobalLimit: c.AutoNATLimit,
+        PeerLimit: c.AutoNATPeerLimit,
+    }
 
     //
     // Swarm ports
@@ -516,7 +528,6 @@ func start_node(cfg_json string, n *Node, repoRoot string) C.int {
    }
 
 	elapsed := time.Since(start)
-	// TODO:IPFS check why relay mode is default here
     log.Printf("IPFS core.NewNode startup time %v, relay mode is %v", elapsed, cfg.Swarm.Transports.Network.Relay)
 
     // TODO:IPFS do we need this?

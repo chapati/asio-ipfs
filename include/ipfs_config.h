@@ -31,6 +31,9 @@ namespace asio_ipfs
         unsigned int grace_period = 20;
         unsigned int node_swarm_port = 10100;
         unsigned int node_api_port = 0;
+        bool autonat = true;
+        unsigned int autonat_limit = 30;
+        unsigned int autonat_peer_limit = 3;
         std::vector<std::string> bootstrap;
         bool auto_relay = true;
         bool relay_hop = false;

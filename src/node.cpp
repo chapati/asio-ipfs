@@ -189,18 +189,21 @@ static string config_to_json(config cfg)
 
     auto json = nlohmann::json
     {
-        {"RepoRoot",       cfg.repo_root},
-        {"Online",         cfg.online},
-        {"LowWater",       cfg.low_water},
-        {"HighWater",      cfg.high_water},
-        {"GracePeriod",    std::to_string(cfg.grace_period) + std::string("s")},
-        {"Bootstrap",      cfg.bootstrap},
-        {"NodeSwarmPort",  cfg.node_swarm_port},
-        {"NodeApiPort",    cfg.node_api_port},
-        {"DefaultProfile", cfg.default_profile},
-        {"AutoRelay",      cfg.auto_relay},
-        {"RelayHop",       cfg.relay_hop},
-        {"StorageMax",     cfg.storage_max}
+        {"RepoRoot",         cfg.repo_root},
+        {"Online",           cfg.online},
+        {"LowWater",         cfg.low_water},
+        {"HighWater",        cfg.high_water},
+        {"GracePeriod",      std::to_string(cfg.grace_period) + std::string("s")},
+        {"Bootstrap",        cfg.bootstrap},
+        {"NodeSwarmPort",    cfg.node_swarm_port},
+        {"NodeApiPort",      cfg.node_api_port},
+        {"DefaultProfile",   cfg.default_profile},
+        {"AutoRelay",        cfg.auto_relay},
+        {"RelayHop",         cfg.relay_hop},
+        {"StorageMax",       cfg.storage_max},
+        {"AutoNAT",          cfg.autonat},
+        {"AutoNATLimit",     cfg.autonat_limit},
+        {"AutoNATPeerLimit", cfg.autonat_peer_limit}
     };
 
     return json.dump();
