@@ -239,7 +239,7 @@ elseif(WIN64)
 
     add_custom_command(
         OUTPUT ${BINDINGS_OUTPUT}       
-        DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/include/pfs_error_codes.h
+        DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/include/ipfs_error_codes.h
                 ${CMAKE_CURRENT_SOURCE_DIR}/src/ipfs_bindings/ipfs_bindings.go
                 golang tdmgcce
 
