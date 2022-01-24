@@ -159,6 +159,17 @@ endif()
 set(BINDINGS_DIR     "${CMAKE_CURRENT_BINARY_DIR}/ipfs_bindings")
 set(GOPATH_IPFS_DIR  "${GOPATH}/src/github.com/equalitie/asio-ipfs")
 
+set(BINDINGS_SRC
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/ipfs_bindings/ipfs_bindings.go
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/ipfs_bindings/ipfs_node.go
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/ipfs_bindings/ipfs_config.go
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/ipfs_bindings/ipfs_cancel.go
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/ipfs_bindings/ipfs_repo.go
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/ipfs_bindings/ipfs_gc.go
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/ipfs_bindings/ipfs_api.go
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/ipfs_bindings/ipfs_mfs.go
+)
+
 if (LINUX)
     set(BINDINGS_HEADER  "${BINDINGS_DIR}/libipfs-bindings.h")
     set(BINDINGS_LIBRARY "${BINDINGS_DIR}/libipfs-bindings.a")
@@ -167,7 +178,7 @@ if (LINUX)
     add_custom_command(
         OUTPUT  ${BINDINGS_OUTPUT}
         DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/include/ipfs_error_codes.h
-                ${CMAKE_CURRENT_SOURCE_DIR}/src/ipfs_bindings/ipfs_bindings.go
+                ${BINDINGS_SRC}
                 golang
 
         COMMAND ${CMAKE_COMMAND} -E make_directory ${BINDINGS_DIR}
@@ -203,7 +214,7 @@ elseif (DARWIN)
     add_custom_command(
         OUTPUT  ${BINDINGS_OUTPUT}
         DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/include/ipfs_error_codes.h
-                ${CMAKE_CURRENT_SOURCE_DIR}/src/ipfs_bindings/ipfs_bindings.go
+                ${BINDINGS_SRC}
                 golang
 
         COMMAND ${CMAKE_COMMAND} -E make_directory ${BINDINGS_DIR}
@@ -240,7 +251,7 @@ elseif(WIN64)
     add_custom_command(
         OUTPUT ${BINDINGS_OUTPUT}       
         DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/include/ipfs_error_codes.h
-                ${CMAKE_CURRENT_SOURCE_DIR}/src/ipfs_bindings/ipfs_bindings.go
+                ${BINDINGS_SRC}
                 golang tdmgcce
 
         COMMAND ${CMAKE_COMMAND} -E make_directory ${BINDINGS_DIR}        

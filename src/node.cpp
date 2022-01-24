@@ -30,7 +30,6 @@ struct HandleBase : public intr::list_base_hook
 };
 
 struct asio_ipfs::node_impl {
-    uint64_t ipfs_handle;
     asio::io_service& ios;
     intr::list<HandleBase, intr::constant_time_size<false>> handles;
 
@@ -42,7 +41,6 @@ struct asio_ipfs::node_impl {
 template<class... As>
 struct Handle : public HandleBase {
     asio::io_service& ios;
-    uint64_t ipfs_handle;
     function<void(sys::error_code, As&&...)> cb;
     function<void()>* cancel_fn;
     function<void()> destructor_cancel_fn;
@@ -55,7 +53,6 @@ struct Handle : public HandleBase {
           , function<void()>* cancel_fn_
           , function<void(sys::error_code, As&&...)> cb_)
         : ios(impl->ios)
-        , ipfs_handle(impl->ipfs_handle)
         , cancel_fn(cancel_fn_ ? cancel_fn_ : &destructor_cancel_fn)
         , cancel_signal_id(cancel_signal_id_)
         , work(asio::io_service::work(ios))
@@ -65,7 +62,7 @@ struct Handle : public HandleBase {
         cb = [this, cb_ = std::move(cb_)] (sys::error_code ec, As... args) {
             (*cancel_fn) = []{};
             if (cancel_signal_id) {
-                go_asio_ipfs_cancellation_free(ipfs_handle, *cancel_signal_id);
+                go_asio_ipfs_cancellation_free(*cancel_signal_id);
             }
             // We need to unlink here, otherwise the callback could invoke the
             // destructor, which would in turn call `cancel` and expect that it
@@ -78,7 +75,7 @@ struct Handle : public HandleBase {
         *cancel_fn = [this] {
             unlink();
             if (cancel_signal_id) {
-                go_asio_ipfs_cancel(ipfs_handle, *cancel_signal_id);
+                go_asio_ipfs_cancel(*cancel_signal_id);
             }
 
             assert(cb);
@@ -153,10 +150,8 @@ void call_ipfs(
     F ipfs_function,
     As... args
 ) {
-    uint64_t cancel_signal_id = go_asio_ipfs_cancellation_allocate(node->ipfs_handle);
-
+    uint64_t cancel_signal_id = go_asio_ipfs_cancellation_allocate();
     ipfs_function(
-        node->ipfs_handle,
         cancel_signal_id,
         args...,
         (void*) &callback_function<CbAs...>::callback,
@@ -173,7 +168,6 @@ void call_ipfs_nocancel(
     As... args
 ) {
     ipfs_function(
-        node->ipfs_handle,
         args...,
         (void*) &callback_function<CbAs...>::callback,
         (void*) (new Handle<CbAs...>{ node, boost::none, cancel, std::move(callback) })
@@ -190,20 +184,23 @@ static string config_to_json(config cfg)
     auto json = nlohmann::json
     {
         {"RepoRoot",         cfg.repo_root},
-        {"Online",           cfg.online},
         {"LowWater",         cfg.low_water},
         {"HighWater",        cfg.high_water},
         {"GracePeriod",      std::to_string(cfg.grace_period) + std::string("s")},
         {"Bootstrap",        cfg.bootstrap},
-        {"NodeSwarmPort",    cfg.node_swarm_port},
-        {"NodeApiPort",      cfg.node_api_port},
+        {"SwarmPort",        cfg.swarm_port},
+        {"APIPort",          cfg.api_port},
+        {"GatewayPort",      cfg.gateway_port},
         {"DefaultProfile",   cfg.default_profile},
         {"AutoRelay",        cfg.auto_relay},
         {"RelayHop",         cfg.relay_hop},
         {"StorageMax",       cfg.storage_max},
         {"AutoNAT",          cfg.autonat},
         {"AutoNATLimit",     cfg.autonat_limit},
-        {"AutoNATPeerLimit", cfg.autonat_peer_limit}
+        {"AutoNATPeerLimit", cfg.autonat_peer_limit},
+        {"SwarmKey",         cfg.swarm_key},
+        {"RoutingType",      cfg.routing_type},
+        {"RunGC",            cfg.run_gc},
     };
 
     return json.dump();
@@ -212,36 +209,43 @@ static string config_to_json(config cfg)
 node::node(asio::io_service& ios, config cfg)
 {
     string cfg_s = config_to_json(cfg);
-
-    uint64_t ipfs_handle = go_asio_ipfs_allocate();
-    int ec = go_asio_ipfs_start_blocking( ipfs_handle
-                                        , (char*) cfg_s.c_str()
-                                        , (char*) cfg.repo_root.data());
+    int ec = go_asio_ipfs_start_blocking((char*)cfg_s.c_str(), (char*) cfg.repo_root.data());
 
     if (ec != IPFS_SUCCESS) {
-        go_asio_ipfs_free(ipfs_handle);
-        throw std::runtime_error("node: Failed to start IPFS");
+        auto err = error::make_error_code(error::ipfs_error{ec});
+        throw std::runtime_error(err.message());
     }
 
     _impl = make_unique<node_impl>(ios);
-    _impl->ipfs_handle = ipfs_handle;
 }
 
-node::~node()
-{
+void node::free() {
     if (_impl) {
         // Make sure all handlers get completed.
         while (!_impl->handles.empty()) {
             auto& e = _impl->handles.front();
             e.cancel();
-            /*
-             * The handle will unlink itself in cancel(),
-             * so there is no need to pop_front().
-             */
         }
 
-        // TODO:check and throw errors, move dtor to function
-        go_asio_ipfs_free(_impl->ipfs_handle);
+        auto ec = go_asio_ipfs_free();
+        if (ec != IPFS_SUCCESS) {
+            auto err = error::make_error_code(error::ipfs_error{ec});
+            throw std::runtime_error(err.message());
+        }
+
+        _impl.reset();
+    }
+}
+
+node::~node()
+{
+    try
+    {
+        free();
+    }
+    catch(std::runtime_error&)
+    {
+        assert(false);
     }
 }
 
@@ -256,11 +260,8 @@ void node::build_( asio::io_service& ios
      * CopyConstructible for some reason.
      */
     auto impl = new node_impl(ios);
-    impl->ipfs_handle = go_asio_ipfs_allocate();
-
     std::function<void(sys::error_code)> cb_ = [cb = move(cb), impl] (sys::error_code ec) {
         if (ec) {
-            go_asio_ipfs_free(impl->ipfs_handle);
             delete impl;
             cb(ec, nullptr);
         } else {
@@ -271,7 +272,6 @@ void node::build_( asio::io_service& ios
     };
 
     string cfg_s = config_to_json(cfg);
-
     call_ipfs_nocancel( impl
                       , cancel
                       , cb_
@@ -280,11 +280,11 @@ void node::build_( asio::io_service& ios
 }
 
 node::node() = default;
-node::node(node&&) = default;
-node& node::operator=(node&&) = default;
+node::node(node&&) noexcept = default;
+node& node::operator=(node&&) noexcept = default;
 
 string node::id() const {
-    char* cid = go_asio_ipfs_node_id(_impl->ipfs_handle);
+    char* cid = go_asio_ipfs_node_id();
     string ret(cid);
     go_asio_memfree(cid);
     return ret;

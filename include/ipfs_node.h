@@ -33,8 +33,8 @@ public:
     // async `node::build` function instead.
     node(boost::asio::io_service&, config);
 
-    node(node&&);
-    node& operator=(node&&);
+    node(node&&) noexcept;
+    node& operator=(node&&) noexcept;
 
     node(const node&) = delete;
     node& operator=(const node&) = delete;
@@ -120,6 +120,7 @@ public:
     void gc(Cancel&, Token&&);
 
     boost::asio::io_service& get_io_service();
+    void free();
     ~node();
 
 private:

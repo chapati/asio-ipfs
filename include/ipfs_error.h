@@ -9,14 +9,14 @@ namespace asio_ipfs::error {
     struct ipfs_error {
         int error_number;
     };
-    
+
     enum error_t {
         db_download_failed = 1, // Start with > 0, because 0 means success.,
         invalid_db_format,
         malformed_db_entry,
         missing_ipfs_link,
     };
-    
+
     struct ipfs_category : public boost::system::error_category
     {
         [[nodiscard]] const char* name() const noexcept override
@@ -29,18 +29,18 @@ namespace asio_ipfs::error {
             switch (e) {
                 case IPFS_SUCCESS:
                     return "success";
+                case IPFS_NODE_EXISTS:
+                    return "node aleady exists";
                 case IPFS_PARSE_CONFIG_FAIL:
                     return "failed to parse IPFS config";
                 case IPFS_READ_CONFIG_FAILED:
                     return "failed to read config from IPFS respo";
                 case IPFS_CREATE_REPO_FAILED:
                     return "failed to create IPFS repository";
-                case IPFS_CREATE_API_FAILED:
-                    return "failed to create core API";
+                case IPFS_API_ACCESS_FAILED:
+                    return "failed to access core API";
                 case IPFS_START_NODE_FAILED:
                     return "failed to start IPFS node";
-                case IPFS_READ_PEERS_FAILED:
-                    return "failed to read peers list";
                 case IPFS_MPROME_INJECT_FAILED:
                     return "failed to inject mprome";
                 case IPFS_FLATFS_FAILED:
@@ -65,12 +65,24 @@ namespace asio_ipfs::error {
                     return "failed to unpin";
                 case IPFS_GC_FAILED:
                     return "failed to garbage collect";
+                case IPFS_API_FAILED:
+                    return "failed to start API";
+                case IPFS_GATEWAY_FAILED:
+                    return "failed to start Gateway";
+                case IPFS_MFSPIN_FAILED:
+                    return "failes to start MFS pin service";
+                case IPFS_BUILD_ENV_FAILED:
+                    return "failed to build initital environment";
+                case IPFS_OPEN_REPO_FAILED:
+                    return "failed to open repo";
+                case IPFS_PLUGINS_FAILED:
+                    return "failed to start plugins";
                 default:
                     return "unknown ipfs error";
             }
         }
     };
-    
+
     struct asio_ipfs_category : public boost::system::error_category
     {
         [[nodiscard]] const char* name() const noexcept override
@@ -94,10 +106,10 @@ namespace asio_ipfs::error {
             }
         }
     };
-    
+
     boost::system::error_code
     make_error_code(::asio_ipfs::error::ipfs_error);
-    
+
     boost::system::error_code
     make_error_code(::asio_ipfs::error::error_t);
 
