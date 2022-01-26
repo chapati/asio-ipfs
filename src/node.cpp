@@ -33,9 +33,17 @@ struct asio_ipfs::node_impl {
     asio::io_service& ios;
     intr::list<HandleBase, intr::constant_time_size<false>> handles;
 
-    explicit node_impl(asio::io_service& ios)
+    asio_ipfs::node::StateCB scb;
+    static void stateCB(void* self, const char* err, uint32_t peercnt) {
+        std::string serr(err ? err : "");
+        reinterpret_cast<node_impl*>(self)->scb(serr, peercnt);
+    }
+
+    explicit node_impl(asio::io_service& ios, asio_ipfs::node::StateCB scb)
         : ios(ios)
-    {}
+        , scb(move(scb))
+    {
+    }
 };
 
 template<class... As>
@@ -103,7 +111,7 @@ struct Handle : public HandleBase {
      * This function is always called, in a go thread. If the Handle was
      * cancelled, self->cb is empty.
      */
-    static void call(int err, void* arg, As... args) {
+    static void call(int32_t err, void* arg, As... args) {
         auto self = reinterpret_cast<Handle*>(arg);
         self->ios.post([
             self,
@@ -125,19 +133,19 @@ struct Handle : public HandleBase {
 template<class... As> struct callback_function;
 
 template<> struct callback_function<> {
-    static void callback(int err, void* arg) {
+    static void callback(int32_t err, void* arg) {
         Handle<>::call(err, arg);
     }
 };
 
 template<> struct callback_function<std::string> {
-    static void callback(int err, const char* data, size_t size, void* arg) {
+    static void callback(int32_t err, const char* data, size_t size, void* arg) {
         Handle<std::string>::call(err, arg, std::string(data, data + size));
     }
 };
 
 template<> struct callback_function<std::vector<uint8_t>> {
-    static void callback(int err, const uint8_t* data, size_t size, void* arg) {
+    static void callback(int32_t err, const uint8_t* data, size_t size, void* arg) {
         Handle<std::vector<uint8_t>>::call(err, arg, std::vector<uint8_t>(data, data + size));
     }
 };
@@ -206,17 +214,22 @@ static string config_to_json(config cfg)
     return json.dump();
 }
 
-node::node(asio::io_service& ios, config cfg)
+node::node(asio::io_service& ios, StateCB scb, config cfg)
 {
     string cfg_s = config_to_json(cfg);
-    int ec = go_asio_ipfs_start_blocking((char*)cfg_s.c_str(), (char*) cfg.repo_root.data());
+    _impl = make_unique<node_impl>(ios, move(scb));
+
+    auto ec = go_asio_ipfs_start_blocking(
+                (char*) cfg_s.c_str(),
+                (char*) cfg.repo_root.data(),
+                (void*) &node_impl::stateCB,
+                (void*) _impl.get()
+                );
 
     if (ec != IPFS_SUCCESS) {
         auto err = error::make_error_code(error::ipfs_error{ec});
         throw std::runtime_error(err.message());
     }
-
-    _impl = make_unique<node_impl>(ios);
 }
 
 void node::free() {
@@ -250,16 +263,16 @@ node::~node()
 }
 
 void node::build_( asio::io_service& ios
+                 , StateCB scb
                  , config cfg
                  , Cancel* cancel
-                 , function<void( const sys::error_code& ec
-                                , unique_ptr<node>)> cb)
+                 , function<void( const sys::error_code& ec, unique_ptr<node>)> cb)
 {
     /*
      * This cannot be a unique_ptr, because std::function wants to be
      * CopyConstructible for some reason.
      */
-    auto impl = new node_impl(ios);
+    auto impl = new node_impl(ios, move(scb));
     std::function<void(sys::error_code)> cb_ = [cb = move(cb), impl] (sys::error_code ec) {
         if (ec) {
             delete impl;
@@ -275,8 +288,11 @@ void node::build_( asio::io_service& ios
     call_ipfs_nocancel( impl
                       , cancel
                       , cb_
-                      , go_asio_ipfs_start_async, (char*) cfg_s.c_str()
-                                                , (char*) cfg.repo_root.data());
+                      , go_asio_ipfs_start_async
+                      , (char*) cfg_s.c_str()
+                      , (char*) cfg.repo_root.data()
+                      , (void*) &node_impl::stateCB
+                      , (void*) impl);
 }
 
 node::node() = default;

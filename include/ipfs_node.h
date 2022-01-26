@@ -26,12 +26,13 @@ class node {
 
 public:
     static const uint32_t CID_SIZE = 46;
+    using StateCB = std::function<void (const std::string& error, uint32_t peercnt)>;
 
 public:
     // This constructor may do repository initialization disk IO and as such
     // may block for a second or more. If that is undesired, use the static
     // async `node::build` function instead.
-    node(boost::asio::io_service&, config);
+    node(boost::asio::io_service&, StateCB scb, config);
 
     node(node&&) noexcept;
     node& operator=(node&&) noexcept;
@@ -40,14 +41,12 @@ public:
     node& operator=(const node&) = delete;
 
     template<class Token>
-    static
-    typename Result<Token, std::unique_ptr<node>>::return_type
-    build(boost::asio::io_service&, config, Token&&);
+    static typename Result<Token, std::unique_ptr<node>>::return_type
+    build(boost::asio::io_service&, StateCB, config, Token&&);
 
     template<class Token>
-    static
-    typename Result<Token, std::unique_ptr<node>>::return_type
-    build(boost::asio::io_service&, config, Cancel&, Token&&);
+    static typename Result<Token, std::unique_ptr<node>>::return_type
+    build(boost::asio::io_service&, StateCB, config, Cancel&, Token&&);
 
     // Returns this node's IPFS ID
     [[nodiscard]] std::string id() const;
@@ -124,11 +123,9 @@ public:
     ~node();
 
 private:
-    node();
-
-private:
     static
     void build_( boost::asio::io_service& ios
+               , StateCB scb
                , config
                , Cancel* cancel
                , std::function<void( const boost::system::error_code&
@@ -171,6 +168,7 @@ private:
              , std::function<void(boost::system::error_code)>);
 
 private:
+    node();
     std::unique_ptr<node_impl> _impl;
 };
 
@@ -178,13 +176,15 @@ template<class Token>
 inline
 typename node::Result<Token, std::unique_ptr<node>>::return_type
 node::build( boost::asio::io_service& ios
+           , StateCB scb
            , config cfg
            , Token&& token)
 {
     using BackendP = std::unique_ptr<node>;
     Handler<Token, BackendP> handler(std::forward<Token>(token));
     Result<Token, BackendP> result(handler);
-    build_(ios, cfg, nullptr, std::move(handler));
+
+    build_(ios, move(scb), cfg, nullptr, std::move(handler));
     return result.get();
 }
 
@@ -192,6 +192,7 @@ template<class Token>
 inline
 typename node::Result<Token, std::unique_ptr<node>>::return_type
 node::build( boost::asio::io_service& ios
+           , StateCB scb
            , config cfg
            , Cancel& cancel
            , Token&& token)
@@ -199,7 +200,7 @@ node::build( boost::asio::io_service& ios
     using BackendP = std::unique_ptr<node>;
     Handler<Token, BackendP> handler(std::forward<Token>(token));
     Result<Token, BackendP> result(handler);
-    build_(ios, cfg, &cancel, std::move(handler));
+    build_(ios, move(scb), cfg, &cancel, std::move(handler));
     return result.get();
 }
 

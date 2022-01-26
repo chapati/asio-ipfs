@@ -42,6 +42,8 @@ type Node struct {
 	cancel context.CancelFunc
 	next_cancel_signal_id C.uint64_t
 	cancel_signals map[C.uint64_t]func()
+	state_cb unsafe.Pointer
+	state_cb_arg unsafe.Pointer
 }
 
 // vars below can be accessed only from C thread
@@ -238,34 +240,67 @@ func start_node(jsoncfg string, n *Node, repoRoot string) C.int {
     }
     printPeers(n)
 
-    // TODO:IPFS notify about errors
+    if (n.state_cb == nil) {
+        panic("IPFS state callback is not provided")
+    }
+
     if gcErrc != nil || apiErrc != nil || gwErrc != nil {
         go func () {
-            log.Println("IPFS monitor is launched")
+            totalPeers := func () uint32 {
+                var res float64 = 0
+                for _, val := range n.collector.PeersTotalValues() {
+                    res += val
+                }
+                return uint32(res)
+            }
+
+            log.Println("IPFS state monitor is launched")
+            pcnt := totalPeers()
+            executeStateCB(n, nil, pcnt)
+
+            var lasterr error
             for {
                 select {
                 case err := <- gcErrc:
                     if err != nil {
                         log.Println("IPFS gc error: ", err)
+                        lasterr = err
                     } else {
                         gcErrc = nil
                     }
+
                 case err := <- apiErrc:
                     if err != nil {
                         log.Println("IPFS API error: ", err)
+                        lasterr = err
                     } else {
                         apiErrc = nil
                     }
+
                 case err := <- gwErrc:
                     if err != nil {
                         log.Println("IPFS Gateway error: ", err)
+                        lasterr = err
                     } else {
                         gwErrc = nil
                     }
-                }
-                if gcErrc == nil && apiErrc == nil && gwErrc == nil {
-                    log.Println("IPFS monitor is stopped")
+
+                case <- time.After(time.Second * 2):
+                    ncnt := totalPeers()
+                    if pcnt != ncnt {
+                        pcnt = ncnt
+                        executeStateCB(n, lasterr, pcnt)
+                    }
+
+                case <- n.ctx.Done():
+                    executeStateCB(n, lasterr, 0)
+                    log.Println("IPFS state monitor is stopped")
                     return
+                }
+
+                if lasterr != nil {
+                    // TODO:IPFS check that this works
+                    n.cancel()
                 }
             }
         } ()
@@ -287,7 +322,7 @@ func printVersion() {
 }
 
 func printPeers(n *Node) {
-    // TODO:IPFS add to state monitoring
+
     peers, err := n.api.Swarm().Peers(n.node.Context())
     if err != nil {
         log.Println("Failed to read swarm peers:", err)
@@ -341,7 +376,7 @@ func printSwarmAddrs(node *core.IpfsNode) {
 	}
 }
 
-func allocate_node() C.int {
+func allocate_node(state_cb unsafe.Pointer, state_cb_arg unsafe.Pointer) C.int {
     if g_node != nil {
         return C.IPFS_NODE_EXISTS
     }
@@ -350,13 +385,15 @@ func allocate_node() C.int {
 	g_node.ctx, g_node.cancel = context.WithCancel(context.Background())
 	g_node.next_cancel_signal_id = 0
 	g_node.cancel_signals = make(map[C.uint64_t]func())
+	g_node.state_cb = state_cb
+	g_node.state_cb_arg = state_cb_arg
 
 	return C.IPFS_SUCCESS
 }
 
 //export go_asio_ipfs_start_blocking
-func go_asio_ipfs_start_blocking(c_cfg *C.char, c_repoPath *C.char) C.int {
-	if err:= allocate_node(); err != C.IPFS_SUCCESS {
+func go_asio_ipfs_start_blocking(c_cfg *C.char, c_repoPath *C.char, state_cb unsafe.Pointer, state_cb_arg unsafe.Pointer) C.int32_t {
+	if err:= allocate_node(state_cb, state_cb_arg); err != C.IPFS_SUCCESS {
 	    return err
 	}
 
@@ -373,8 +410,12 @@ func go_asio_ipfs_start_blocking(c_cfg *C.char, c_repoPath *C.char) C.int {
 }
 
 //export go_asio_ipfs_start_async
-func go_asio_ipfs_start_async(c_cfg *C.char, c_repoPath *C.char, fn unsafe.Pointer, fn_arg unsafe.Pointer) {
-	if err:= allocate_node(); err != C.IPFS_SUCCESS {
+func go_asio_ipfs_start_async(c_cfg *C.char,
+                              c_repoPath *C.char,
+                              state_cb unsafe.Pointer, state_cb_arg unsafe.Pointer,
+                              fn unsafe.Pointer, fn_arg unsafe.Pointer) {
+
+	if err:= allocate_node(state_cb, state_cb_arg); err != C.IPFS_SUCCESS {
         go func () {
             executeVoidCB(fn, err, fn_arg)
         }()

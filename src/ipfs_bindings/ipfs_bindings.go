@@ -26,13 +26,17 @@ import (
 //// (Or errors saying functions are defined more than once if the're not static).
 //
 //#if IN_GO
-//static void execute_void_cb(void* func, int err, void* arg)
+//static void execute_void_cb(void* func, int32_t err, void* arg)
 //{
 //    ((void(*)(int, void*)) func)(err, arg);
 //}
-//static void execute_data_cb(void* func, int err, void* data, size_t size, void* arg)
+//static void execute_data_cb(void* func, int32_t err, void* data, size_t size, void* arg)
 //{
-//    ((void(*)(int, char*, size_t, void*)) func)(err, data, size, arg);
+//    ((void(*)(uint32_t, char*, size_t, void*)) func)(err, data, size, arg);
+//}
+//static void execute_state_cb(void* func, void* arg, const char* err, uint32_t peercnt)
+//{
+//    ((void(*)(void*, const char*, uint32_t)) func)(arg, err, peercnt);
 //}
 //#endif // if IN_GO
 import "C"
@@ -40,7 +44,19 @@ import "C"
 func main() {
 }
 
-func executeVoidCB(fn unsafe.Pointer, code C.int, fn_arg unsafe.Pointer) {
+func executeStateCB(n* Node, err error, peercnt uint32) {
+    var cstr *C.char
+
+    if err != nil {
+        cstr := C.CString(err.Error())
+        defer C.free(unsafe.Pointer(cstr))
+    }
+
+    C.execute_state_cb(n.state_cb, n.state_cb_arg, cstr, C.uint32_t(peercnt))
+    return
+}
+
+func executeVoidCB(fn unsafe.Pointer, code C.int32_t, fn_arg unsafe.Pointer) {
     C.execute_void_cb(fn, code, fn_arg)
 }
 
