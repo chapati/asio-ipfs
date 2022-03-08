@@ -328,14 +328,14 @@ void node::add_( const uint8_t* data
                , Cancel* cancel
                , function<void(sys::error_code, string)>&& cb)
 {
-    call_ipfs_nocancel(_impl.get(), cancel, std::move(cb), go_asio_ipfs_add, (void*) data, size, pin);
+    call_ipfs(_impl.get(), cancel, std::move(cb), go_asio_ipfs_add, (void*) data, size, pin);
 }
 
 void node::calc_cid_(const uint8_t* data, size_t size
         , Cancel* cancel
         , function<void(sys::error_code, string)>&& cb)
 {
-    call_ipfs_nocancel(_impl.get(), cancel, std::move(cb), go_asio_ipfs_calc_cid, (void*) data, size);
+    call_ipfs(_impl.get(), cancel, std::move(cb), go_asio_ipfs_calc_cid, (void*) data, size);
 }
 
 void node::cat_(const std::string& cid,

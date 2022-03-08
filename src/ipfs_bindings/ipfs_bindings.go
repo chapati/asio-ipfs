@@ -144,7 +144,7 @@ func go_asio_ipfs_publish(cancel_signal C.uint64_t, cid *C.char, seconds C.int64
 }
 
 //export go_asio_ipfs_calc_cid
-func go_asio_ipfs_calc_cid(data unsafe.Pointer, size C.size_t, fn unsafe.Pointer, fn_arg unsafe.Pointer) {
+func go_asio_ipfs_calc_cid(cancel_signal C.uint64_t, data unsafe.Pointer, size C.size_t, fn unsafe.Pointer, fn_arg unsafe.Pointer) {
 	var n = g_node
 	if n == nil {
 	    go func () {
@@ -154,8 +154,10 @@ func go_asio_ipfs_calc_cid(data unsafe.Pointer, size C.size_t, fn unsafe.Pointer
 	}
 
 	msg := C.GoBytes(data, C.int(size))
+	cancel_ctx := withCancel(n, cancel_signal)
+
 	go func() {
-        p, err := n.api.Unixfs().Add(n.node.Context(), files.NewBytesFile(msg), options.Unixfs.HashOnly(true))
+        p, err := n.api.Unixfs().Add(cancel_ctx, files.NewBytesFile(msg), options.Unixfs.HashOnly(true))
         if err != nil {
             log.Println("Error: failed to calculate cid ", err)
             C.execute_data_cb(fn, C.IPFS_CALC_CID_FAILED, nil, C.size_t(0), fn_arg)
@@ -178,7 +180,7 @@ func go_asio_ipfs_calc_cid(data unsafe.Pointer, size C.size_t, fn unsafe.Pointer
 }
 
 //export go_asio_ipfs_add
-func go_asio_ipfs_add(data unsafe.Pointer, size C.size_t, pin bool, fn unsafe.Pointer, fn_arg unsafe.Pointer) {
+func go_asio_ipfs_add(cancel_signal C.uint64_t, data unsafe.Pointer, size C.size_t, pin bool, fn unsafe.Pointer, fn_arg unsafe.Pointer) {
 	var n = g_node
 	if n == nil {
 	    go func () {
@@ -188,8 +190,10 @@ func go_asio_ipfs_add(data unsafe.Pointer, size C.size_t, pin bool, fn unsafe.Po
 	}
 
 	msg := C.GoBytes(data, C.int(size))
+	cancel_ctx := withCancel(n, cancel_signal)
+
 	go func() {
-        p, err := n.api.Unixfs().Add(n.node.Context(), files.NewBytesFile(msg), options.Unixfs.Pin(pin))
+        p, err := n.api.Unixfs().Add(cancel_ctx, files.NewBytesFile(msg), options.Unixfs.Pin(pin))
         if err != nil {
             log.Println("Error: failed to insert content ", err)
             C.execute_data_cb(fn, C.IPFS_ADD_FAILED, nil, C.size_t(0), fn_arg)
