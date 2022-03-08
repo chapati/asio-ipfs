@@ -44,16 +44,21 @@ import "C"
 func main() {
 }
 
-func executeStateCB(n* Node, err error, peercnt uint32) {
-    var cstr *C.char
+func makeStateCB(n* Node) func (err error, peercnt uint32) {
+    state_cb := n.state_cb
+    state_arg := n.state_cb_arg
 
-    if err != nil {
-        cstr := C.CString(err.Error())
-        defer C.free(unsafe.Pointer(cstr))
+    return func (err error, peercnt uint32) {
+        var cstr *C.char
+
+        if err != nil {
+            cstr = C.CString(err.Error())
+            defer C.free(unsafe.Pointer(cstr))
+        }
+
+        C.execute_state_cb(state_cb, state_arg, cstr, C.uint32_t(peercnt))
+        return
     }
-
-    C.execute_state_cb(n.state_cb, n.state_cb_arg, cstr, C.uint32_t(peercnt))
-    return
 }
 
 func executeVoidCB(fn unsafe.Pointer, code C.int32_t, fn_arg unsafe.Pointer) {

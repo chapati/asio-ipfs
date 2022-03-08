@@ -256,7 +256,8 @@ func start_node(jsoncfg string, n *Node, repoRoot string) C.int {
 
             log.Println("IPFS state monitor is launched")
             pcnt := totalPeers()
-            executeStateCB(n, nil, pcnt)
+            stateCB := makeStateCB(n)
+            stateCB(nil, pcnt)
 
             var lasterr error
             for {
@@ -289,11 +290,14 @@ func start_node(jsoncfg string, n *Node, repoRoot string) C.int {
                     ncnt := totalPeers()
                     if pcnt != ncnt {
                         pcnt = ncnt
-                        executeStateCB(n, lasterr, pcnt)
+                        stateCB(nil, pcnt)
                     }
+                    // IPFS:TEST
+                    // lasterr = fmt.Errorf("error loading plugins: %s", err)
 
                 case <- n.ctx.Done():
-                    executeStateCB(n, lasterr, 0)
+                    fmt.Println(lasterr)
+                    stateCB(lasterr, 0)
                     log.Println("IPFS state monitor is stopped")
                     return
                 }
