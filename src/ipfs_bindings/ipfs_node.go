@@ -296,7 +296,6 @@ func start_node(jsoncfg string, n *Node, repoRoot string) C.int {
                     // lasterr = fmt.Errorf("error loading plugins: %s", err)
 
                 case <- n.ctx.Done():
-                    fmt.Println(lasterr)
                     stateCB(lasterr, 0)
                     log.Println("IPFS state monitor is stopped")
                     return
