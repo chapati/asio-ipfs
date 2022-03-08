@@ -303,7 +303,6 @@ func start_node(jsoncfg string, n *Node, repoRoot string) C.int {
                 }
 
                 if lasterr != nil {
-                    // TODO:IPFS check that this works
                     n.cancel()
                 }
             }
