@@ -324,32 +324,23 @@ void node::resolve_( const string& node_id
 
 void node::add_( const uint8_t* data
                , size_t size
+               , bool pin
                , Cancel* cancel
                , function<void(sys::error_code, string)>&& cb)
 {
-    call_ipfs_nocancel(_impl.get(), cancel, std::move(cb), go_asio_ipfs_add, (void*) data, size, false);
+    call_ipfs_nocancel(_impl.get(), cancel, std::move(cb), go_asio_ipfs_add, (void*) data, size, pin);
 }
 
-void node::calculate_cid_( const string_view data
-                         , Cancel* cancel
-                         , function<void(sys::error_code, string)> cb)
+void node::calc_cid_(const uint8_t* data, size_t size
+        , Cancel* cancel
+        , function<void(sys::error_code, string)>&& cb)
 {
-    const char* d = data.data();
-    size_t s = data.size();
-    call_ipfs_nocancel(_impl.get(), cancel, std::move(cb), go_asio_ipfs_add, (void*) d, s, true);
+    call_ipfs_nocancel(_impl.get(), cancel, std::move(cb), go_asio_ipfs_calc_cid, (void*) data, size);
 }
 
-void node::cat_( string_view cid
-               , Cancel* cancel
-               , std::function<void(boost::system::error_code, std::vector<uint8_t>)> cb)
-{
-    assert(cid.size() == CID_SIZE);
-    call_ipfs(_impl.get(), cancel, std::move(cb), go_asio_ipfs_cat, (char*) cid.data());
-}
-
-void node::cat_( string_view cid
-               , Cancel* cancel
-               , function<void(sys::error_code, string)> cb)
+void node::cat_(const std::string& cid,
+                Cancel* cancel,
+                std::function<void(boost::system::error_code, std::vector<uint8_t>)> cb)
 {
     assert(cid.size() == CID_SIZE);
     call_ipfs(_impl.get(), cancel, std::move(cb), go_asio_ipfs_cat, (char*) cid.data());

@@ -51,6 +51,8 @@ namespace asio_ipfs::error {
                     return "failed to find a node";
                 case IPFS_RESOLVE_FAILED:
                     return "failed to resolve IPNS entry";
+                case IPFS_CALC_CID_FAILED:
+                    return "failed to calculate CID";
                 case IPFS_ADD_FAILED:
                     return "failed to add data";
                 case IPFS_CAT_FAILED:

@@ -143,8 +143,8 @@ func go_asio_ipfs_publish(cancel_signal C.uint64_t, cid *C.char, seconds C.int64
 	}()
 }
 
-//export go_asio_ipfs_add
-func go_asio_ipfs_add(data unsafe.Pointer, size C.size_t, only_hash bool, fn unsafe.Pointer, fn_arg unsafe.Pointer) {
+//export go_asio_ipfs_calc_cid
+func go_asio_ipfs_calc_cid(data unsafe.Pointer, size C.size_t, fn unsafe.Pointer, fn_arg unsafe.Pointer) {
 	var n = g_node
 	if n == nil {
 	    go func () {
@@ -155,12 +155,46 @@ func go_asio_ipfs_add(data unsafe.Pointer, size C.size_t, only_hash bool, fn uns
 
 	msg := C.GoBytes(data, C.int(size))
 	go func() {
-		p, err := n.api.Unixfs().Add(n.node.Context(), files.NewBytesFile(msg), options.Unixfs.HashOnly(only_hash))
+        p, err := n.api.Unixfs().Add(n.node.Context(), files.NewBytesFile(msg), options.Unixfs.HashOnly(true))
+        if err != nil {
+            log.Println("Error: failed to calculate cid ", err)
+            C.execute_data_cb(fn, C.IPFS_CALC_CID_FAILED, nil, C.size_t(0), fn_arg)
+            return;
+        }
+
+		cid := p.Root()
 		if err != nil {
-			log.Println("Error: failed to insert content ", err)
-			C.execute_data_cb(fn, C.IPFS_ADD_FAILED, nil, C.size_t(0), fn_arg)
+			log.Println("Error: failed to parse IPFS path ", err)
+			C.execute_data_cb(fn, C.IPFS_CALC_CID_FAILED, nil, C.size_t(0), fn_arg)
 			return;
 		}
+
+		cidstr := cid.String()
+		cdata := C.CBytes([]byte(cidstr))
+		defer C.free(cdata)
+
+		C.execute_data_cb(fn, C.IPFS_SUCCESS, cdata, C.size_t(len(cidstr)), fn_arg)
+	}()
+}
+
+//export go_asio_ipfs_add
+func go_asio_ipfs_add(data unsafe.Pointer, size C.size_t, pin bool, fn unsafe.Pointer, fn_arg unsafe.Pointer) {
+	var n = g_node
+	if n == nil {
+	    go func () {
+	        C.execute_data_cb(fn, C.IPFS_NO_NODE, nil, C.size_t(0), fn_arg)
+	    } ()
+	    return
+	}
+
+	msg := C.GoBytes(data, C.int(size))
+	go func() {
+        p, err := n.api.Unixfs().Add(n.node.Context(), files.NewBytesFile(msg), options.Unixfs.Pin(pin))
+        if err != nil {
+            log.Println("Error: failed to insert content ", err)
+            C.execute_data_cb(fn, C.IPFS_ADD_FAILED, nil, C.size_t(0), fn_arg)
+            return;
+        }
 
 		cid := p.Root()
 		if err != nil {

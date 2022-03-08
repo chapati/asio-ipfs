@@ -26,3 +26,4 @@
 #define IPFS_GATEWAY_FAILED          22
 #define IPFS_MFSPIN_FAILED           23
 #define IPFS_BUILD_ENV_FAILED        24
+#define IPFS_CALC_CID_FAILED         25
