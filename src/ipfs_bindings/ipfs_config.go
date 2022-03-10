@@ -12,27 +12,29 @@ import (
     "github.com/ipfs/go-ipfs/core"
     "github.com/ipfs/go-ipfs/repo"
     "github.com/ipfs/go-ipfs/core/node/libp2p"
+    "github.com/libp2p/go-libp2p-core/peer"
     ma "github.com/multiformats/go-multiaddr"
 )
 
 type AsioConfig struct {
-	LowWater          int       `json:"LowWater"`
-	HighWater         int       `json:"HighWater"`
-	GracePeriod       string    `json:"GracePeriod"`
-	AutoRelay         bool      `json:"AutoRelay"`
-	RelayHop          bool      `json:"RelayHop"`
-	Bootstrap         []string  `json:"Bootstrap"`
-	SwarmPort         int       `json:"SwarmPort"`
-	APIPort           int       `json:"APIPort"`
-	GatewayPort       int       `json:"GatewayPort"`
-	DefaultProfile    string    `json:"DefaultProfile"`
-	StorageMax        string    `json:"StorageMax"`
-	AutoNAT           bool      `json:"AutoNAT"`
-	AutoNATLimit      int       `json:"AutoNATLimit"`
-	AutoNATPeerLimit  int       `json:"AutoNATPeerLimit"`
-	SwarmKey          string    `json:"SwarmKey"`
-	RoutingType       string    `json:"RoutingType"`
-	RunGC             bool      `json:"RunGC"`
+	LowWater          int                 `json:"LowWater"`
+	HighWater         int                 `json:"HighWater"`
+	GracePeriod       string              `json:"GracePeriod"`
+	AutoRelay         bool                `json:"AutoRelay"`
+	RelayHop          bool                `json:"RelayHop"`
+	Bootstrap         []string            `json:"Bootstrap"`
+	Peering           []string            `json:"Peering"`
+	SwarmPort         int                 `json:"SwarmPort"`
+	APIPort           int                 `json:"APIPort"`
+	GatewayPort       int                 `json:"GatewayPort"`
+	DefaultProfile    string              `json:"DefaultProfile"`
+	StorageMax        string              `json:"StorageMax"`
+	AutoNAT           bool                `json:"AutoNAT"`
+	AutoNATLimit      int                 `json:"AutoNATLimit"`
+	AutoNATPeerLimit  int                 `json:"AutoNATPeerLimit"`
+	SwarmKey          string              `json:"SwarmKey"`
+	RoutingType       string              `json:"RoutingType"`
+	RunGC             bool                `json:"RunGC"`
 }
 
 const (
@@ -157,13 +159,32 @@ func updateConfig(conf *config.Config, c *AsioConfig) error {
     // Bootstrap peers
     //
     if len (c.Bootstrap) == 0 {
-        log.Println("WARNING: empty bootstrap peers in config. Default IPFS bootstrap peers would be used.")
+        log.Println("IPFS WARNING: empty bootstrap peers in config. Default IPFS bootstrap peers would be used.")
     } else {
         ps, err :=  config.ParseBootstrapPeers(c.Bootstrap)
         if err != nil {
             return fmt.Errorf("Failed to parse bootstrap peers: %s", err)
         }
         conf.Bootstrap = config.BootstrapPeerStrings(ps)
+    }
+
+    if len (c.Peering) == 0 {
+        log.Println("IPFS WARNING: empty peering in config.")
+    } else {
+        var maddrs []ma.Multiaddr
+        for _, addr := range c.Peering {
+            maddr, err := ma.NewMultiaddr(addr)
+            if err != nil {
+                return fmt.Errorf("Failed to parse peering address: %s", err)
+            }
+            maddrs = append(maddrs, maddr)
+        }
+
+        addrs, err := peer.AddrInfosFromP2pAddrs(maddrs...)
+        if err != nil {
+            return fmt.Errorf("Failed to parse peering list: %s", err)
+        }
+        conf.Peering.Peers = addrs
     }
 
     return nil

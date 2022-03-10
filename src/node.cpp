@@ -196,6 +196,7 @@ static string config_to_json(config cfg)
         {"HighWater",        cfg.high_water},
         {"GracePeriod",      std::to_string(cfg.grace_period) + std::string("s")},
         {"Bootstrap",        cfg.bootstrap},
+        {"Peering",          cfg.peering},
         {"SwarmPort",        cfg.swarm_port},
         {"APIPort",          cfg.api_port},
         {"GatewayPort",      cfg.gateway_port},
@@ -211,7 +212,8 @@ static string config_to_json(config cfg)
         {"RunGC",            cfg.run_gc},
     };
 
-    return json.dump();
+    auto dump = json.dump();
+    return dump;
 }
 
 namespace
