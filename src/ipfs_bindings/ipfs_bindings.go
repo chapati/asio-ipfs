@@ -38,6 +38,10 @@ import (
 //{
 //    ((void(*)(void*, const char*, uint32_t)) func)(arg, err, peercnt);
 //}
+//static void execute_log_cb(void* func, const char* bytes)
+//{
+//    ((void(*)(const char*)) func)(bytes);
+//}
 //#endif // if IN_GO
 import "C"
 
@@ -63,6 +67,14 @@ func makeStateCB(n* Node) func (err error, peercnt uint32) {
 
 func executeVoidCB(fn unsafe.Pointer, code C.int32_t, fn_arg unsafe.Pointer) {
     C.execute_void_cb(fn, code, fn_arg)
+}
+
+func executeLogCB(fn unsafe.Pointer, data []byte) {
+    // here excessive copying of data but since amout of logs/data is small
+    // there are no reasons to bother with more effective solution
+    cstr := C.CString(string(data[:len(data) - 1]))
+    defer C.free(unsafe.Pointer(cstr))
+    C.execute_log_cb(fn, cstr)
 }
 
 //export go_asio_memfree

@@ -214,6 +214,28 @@ static string config_to_json(config cfg)
     return json.dump();
 }
 
+namespace
+{
+    static node::LogCB log_cb;
+    static void logCB(const char* err) {
+        assert(log_cb);
+        log_cb(err);
+    }
+}
+
+void node::redirect_logs(LogCB logcb)
+{
+    log_cb = std::move(logcb);
+    if (log_cb)
+    {
+        go_asio_ipfs_redirect_logs((void*)&logCB);
+    }
+    else
+    {
+        go_asio_ipfs_redirect_logs(nullptr);
+    }
+}
+
 node::node(asio::io_service& ios, StateCB scb, config cfg)
 {
     string cfg_s = config_to_json(cfg);

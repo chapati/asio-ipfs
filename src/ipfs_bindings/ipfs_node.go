@@ -44,6 +44,7 @@ type Node struct {
 	cancel_signals map[C.uint64_t]func()
 	state_cb unsafe.Pointer
 	state_cb_arg unsafe.Pointer
+	log_cb unsafe.Pointer
 }
 
 // vars below can be accessed only from C thread

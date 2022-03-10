@@ -47,10 +47,11 @@ func maybeServeHTTPApi(n *Node, acfg *AsioConfig) (<-chan error, error) {
 
     for _, listener := range listeners {
         log.Printf("IPFS API server listening on %s\n", listener.Multiaddr())
-        switch listener.Addr().Network() {
-        case "tcp", "tcp4", "tcp6":
-            log.Printf("IPFS WebUI is on http://%s/webui\n", listener.Addr())
-        }
+        // TODO:IPFS enable webui
+        // switch listener.Addr().Network() {
+        // case "tcp", "tcp4", "tcp6":
+        //    log.Printf("IPFS WebUI is on http://%s/webui\n", listener.Addr())
+        // }
     }
 
     // by default, we don't let you load arbitrary ipfs objects through the api,
@@ -61,7 +62,8 @@ func maybeServeHTTPApi(n *Node, acfg *AsioConfig) (<-chan error, error) {
         corehttp.MetricsOpenCensusCollectionOption(),
         corehttp.CheckVersionOption(),
         corehttp.CommandsOption(*n.cctx),
-        corehttp.WebUIOption,
+        // TODO:IPFS enable webui
+        // corehttp.WebUIOption,
         gatewayOpt,
         corehttp.VersionOption(),
         defaultMux("/debug/vars"),

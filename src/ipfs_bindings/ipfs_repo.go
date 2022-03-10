@@ -12,7 +12,7 @@ import (
 )
 
 func initRepo(repoRoot string, asiocfg *AsioConfig) error {
-    log.Print("Initializing IPFS node at %s\n", repoRoot)
+    log.Printf("Initializing IPFS node at %s\n", repoRoot)
 
     identity, err := config.CreateIdentity(os.Stdout, []options.KeyGenerateOption{
         options.Key.Type(options.Ed25519Key),

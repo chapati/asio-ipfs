@@ -168,6 +168,7 @@ set(BINDINGS_SRC
     ${CMAKE_CURRENT_SOURCE_DIR}/src/ipfs_bindings/ipfs_gc.go
     ${CMAKE_CURRENT_SOURCE_DIR}/src/ipfs_bindings/ipfs_api.go
     ${CMAKE_CURRENT_SOURCE_DIR}/src/ipfs_bindings/ipfs_mfs.go
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/ipfs_bindings/ipfs_log.go
 )
 
 if (LINUX)

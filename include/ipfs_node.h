@@ -25,11 +25,15 @@ namespace asio_ipfs {
         static const uint32_t CID_SIZE = 46;
         using StateCB = std::function<void (const std::string& error, uint32_t peercnt)>;
 
+        using LogCB = std::function<void (const char*)>;
+
+        [[maybe_unused]] static void redirect_logs(LogCB);
+
     public:
         // This constructor may do repository initialization disk IO and as such
         // may block for a second or more. If that is undesired, use the static
         // async `node::build` function instead.
-        node(boost::asio::io_service&, StateCB scb, config);
+        node(boost::asio::io_service&, StateCB, config);
 
         node(node&&) noexcept;
         node& operator=(node&&) noexcept;
@@ -106,10 +110,8 @@ namespace asio_ipfs {
         void gc(Cancel&, Token&&);
 
     private:
-        static
-        void build_(boost::asio::io_service& ios, StateCB scb, config, Cancel* cancel,
-                    std::function<void( const boost::system::error_code&, std::unique_ptr<node>)>);
-
+        static void build_(boost::asio::io_service&, StateCB, config, Cancel*,
+                           std::function<void( const boost::system::error_code&, std::unique_ptr<node>)>);
         void add_(const uint8_t* data, size_t size, bool pin, Cancel*, std::function<void(boost::system::error_code, std::string)>&&);
         void calc_cid_(const uint8_t* data, size_t size, Cancel*, std::function<void(boost::system::error_code, std::string)>&&);
         void cat_(const std::string& cid, Cancel*, std::function<void(boost::system::error_code, std::vector<uint8_t>)>);
