@@ -25,8 +25,8 @@ type AsioConfig struct {
 	Bootstrap         []string            `json:"Bootstrap"`
 	Peering           []string            `json:"Peering"`
 	SwarmPort         int                 `json:"SwarmPort"`
-	APIPort           int                 `json:"APIPort"`
-	GatewayPort       int                 `json:"GatewayPort"`
+	APIAddress        string              `json:"APIAddress"`
+	GatewayAddress    string              `json:"GatewayAddress"`
 	DefaultProfile    string              `json:"DefaultProfile"`
 	StorageMax        string              `json:"StorageMax"`
 	AutoNAT           bool                `json:"AutoNAT"`
@@ -126,33 +126,23 @@ func updateConfig(conf *config.Config, c *AsioConfig) error {
     //
     // API port
     //
-    if c.APIPort == 0 {
-        // Zero port is passed, it means we do not want to spin up any API
+    if len(c.APIAddress) == 0 {
+        // Empty API address is passed, it means we do not want to spin up any API
         // Pass slice, otherwise it is marshalled to json as `:null` and casue crash on read
         conf.Addresses.API = make([]string, 0)
     } else {
-        if len(conf.Addresses.API) == 0 {
-            conf.Addresses.API = []string{"/ip4/127.0.0.1/tcp/0"}
-        }
-        if err := replacePorts(conf.Addresses.API, c.APIPort); err != nil {
-            return err
-        }
+        conf.Addresses.API = []string{c.APIAddress}
     }
 
     //
     // Gateway Port
     //
-    if c.GatewayPort == 0 {
-        // Zero port is passed, it means we do not want to spin up any API
+    if len(c.GatewayAddress) == 0 {
+        // Empty address is passed, it means we do not want to spin up any API
         // Pass slice, otherwise it is marshalled to json as `:null` and casue crash on read
         conf.Addresses.Gateway = make([]string, 0)
     } else {
-        if len(conf.Addresses.Gateway) == 0 {
-            conf.Addresses.Gateway = []string{"/ip4/127.0.0.1/tcp/0"}
-        }
-        if err := replacePorts(conf.Addresses.Gateway, c.GatewayPort); err != nil {
-            return err
-        }
+        conf.Addresses.Gateway = []string{c.GatewayAddress}
     }
 
     //

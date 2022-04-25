@@ -20,7 +20,7 @@ func defaultMux(path string) corehttp.ServeOption {
 }
 
 func maybeServeHTTPApi(n *Node, acfg *AsioConfig) (<-chan error, error) {
-	if acfg.APIPort == 0 {
+	if len(acfg.APIAddress) == 0 {
 	    log.Println("IPFS API is disabled")
 		return nil, nil
 	}
@@ -100,7 +100,7 @@ func maybeServeHTTPApi(n *Node, acfg *AsioConfig) (<-chan error, error) {
 }
 
 func maybeServeHTTPGateway(n *Node, acfg *AsioConfig) (<-chan error, error) {
-    if acfg.GatewayPort == 0 {
+    if len(acfg.GatewayAddress) == 0 {
         log.Println("IPFS Gateway is disabled")
         return nil, nil
     }

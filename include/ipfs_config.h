@@ -15,8 +15,8 @@ namespace asio_ipfs
                 auto_relay = false;
                 default_profile = "server";
                 storage_max = "20GB";
-                api_port = 6100;
-                gateway_port = 6200;
+                api_address = "/ip4/127.0.0.1/tcp/6100";;
+                gateway_address = "/ip4/127.0.0.1/tcp/6200";
                 routing_type = "dhtserver";
                 run_gc = false;
             }
@@ -32,8 +32,8 @@ namespace asio_ipfs
         unsigned int high_water = 200;
         unsigned int grace_period = 20;
         unsigned int swarm_port = 10100;
-        unsigned int gateway_port = 0;
-        unsigned int api_port = 0;
+        std::string gateway_address;
+        std::string api_address;
         bool autonat = true;
         unsigned int autonat_limit = 30;
         unsigned int autonat_peer_limit = 3;
