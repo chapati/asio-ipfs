@@ -17,7 +17,7 @@ namespace asio_ipfs
                 storage_max = "20GB";
                 api_address = "/ip4/127.0.0.1/tcp/6100";;
                 gateway_address = "/ip4/127.0.0.1/tcp/6200";
-                routing_type = "dhtserver";
+                routing_type = "dht";
                 run_gc = false;
             }
         }
