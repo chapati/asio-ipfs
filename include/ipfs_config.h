@@ -10,9 +10,7 @@ namespace asio_ipfs
             Server,
         };
 
-        config (enum Mode mode, const std::string& skey)
-            : swarm_key(skey)
-        {
+        explicit config (enum Mode mode) {
             if (mode == Mode::Server) {
                 auto_relay = false;
                 default_profile = "server";
