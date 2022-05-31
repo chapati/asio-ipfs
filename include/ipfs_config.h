@@ -10,7 +10,9 @@ namespace asio_ipfs
             Server,
         };
 
-        explicit config (enum Mode mode) {
+        config (enum Mode mode, const std::string& skey)
+            : swarm_key(skey)
+        {
             if (mode == Mode::Server) {
                 auto_relay = false;
                 default_profile = "server";
@@ -39,7 +41,7 @@ namespace asio_ipfs
         unsigned int autonat_peer_limit = 3;
         std::vector<std::string> bootstrap;
         std::vector<std::string> peering;
-        std::string swarm_key = "/key/swarm/psk/1.0.0/\n/base16/\n1191aea7c9f99f679f477411d9d44f1ea0fdf5b42d995966b14a9000432f8c4a";
+        std::string swarm_key;
         std::string routing_type = "dht";
         bool auto_relay = true;
         bool relay_hop = false;
